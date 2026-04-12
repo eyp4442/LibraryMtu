@@ -1,4 +1,4 @@
-# Library System API Contract (v0.3)
+# Library System API Contract (v0.4)
 
 ## Conventions
 - Base path: `/api`
@@ -72,17 +72,112 @@ Notes:
 
 ---
 
+## Categories
+
+### GET /api/categories
+
+Response (200):
+
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "name": "Software"
+    },
+    {
+      "id": 2,
+      "name": "Science Fiction"
+    }
+  ]
+}
+```
+
+### GET /api/categories/{id}
+
+Response (200):
+
+```json
+{
+  "id": 1,
+  "name": "Software"
+}
+```
+
+### POST /api/categories
+
+Authorization:
+- Admin or Librarian
+
+Request:
+
+```json
+{
+  "name": "Software"
+}
+```
+
+Response (201):
+
+```json
+{
+  "id": 1,
+  "name": "Software"
+}
+```
+
+### PUT /api/categories/{id}
+
+Authorization:
+- Admin or Librarian
+
+Request:
+
+```json
+{
+  "name": "Software Engineering"
+}
+```
+
+Response (200):
+
+```json
+{
+  "id": 1,
+  "name": "Software Engineering"
+}
+```
+
+### DELETE /api/categories/{id}
+
+Authorization:
+- Admin or Librarian
+
+Response (204)
+
+Notes:
+- Category can be deleted only if there are no books connected to it.
+
+---
+
 ## Books
 
 ### GET /api/books
 
 Query params:
-- `query` (optional)
+- `query` (optional, title or general text search)
+- `title` (optional)
+- `author` (optional)
+- `publisher` (optional)
+- `publishedYear` (optional)
+- `isbn` (optional)
+- `categoryId` (optional)
+- `language` (optional)
+- `availableOnly` (optional)
 - `page` (default: 1)
 - `pageSize` (default: 20)
-- `category` (optional)
-- `author` (optional)
-- `availableOnly` (optional)
+- `sortBy` (optional, example: `title`, `publishedYear`, `author`)
+- `sortDirection` (optional, `asc` or `desc`)
 
 Response (200):
 
@@ -95,8 +190,15 @@ Response (200):
       "author": "Robert C. Martin",
       "isbn": "9780132350884",
       "publishedYear": 2008,
-      "category": "Software",
-      "description": "A book about writing clean code."
+      "publisher": "Prentice Hall",
+      "language": "English",
+      "pageCount": 464,
+      "description": "A book about writing clean code.",
+      "coverImageUrl": "/images/books/clean-code.jpg",
+      "categoryId": 1,
+      "categoryName": "Software",
+      "availableCopyCount": 2,
+      "totalCopyCount": 3
     }
   ],
   "page": 1,
@@ -116,8 +218,15 @@ Response (200):
   "author": "Robert C. Martin",
   "isbn": "9780132350884",
   "publishedYear": 2008,
-  "category": "Software",
-  "description": "A book about writing clean code."
+  "publisher": "Prentice Hall",
+  "language": "English",
+  "pageCount": 464,
+  "description": "A book about writing clean code.",
+  "coverImageUrl": "/images/books/clean-code.jpg",
+  "categoryId": 1,
+  "categoryName": "Software",
+  "availableCopyCount": 2,
+  "totalCopyCount": 3
 }
 ```
 
@@ -134,8 +243,12 @@ Request:
   "author": "Robert C. Martin",
   "isbn": "9780132350884",
   "publishedYear": 2008,
-  "category": "Software",
-  "description": "A book about writing clean code."
+  "publisher": "Prentice Hall",
+  "language": "English",
+  "pageCount": 464,
+  "description": "A book about writing clean code.",
+  "coverImageUrl": "/images/books/clean-code.jpg",
+  "categoryId": 1
 }
 ```
 
@@ -148,8 +261,13 @@ Response (201):
   "author": "Robert C. Martin",
   "isbn": "9780132350884",
   "publishedYear": 2008,
-  "category": "Software",
-  "description": "A book about writing clean code."
+  "publisher": "Prentice Hall",
+  "language": "English",
+  "pageCount": 464,
+  "description": "A book about writing clean code.",
+  "coverImageUrl": "/images/books/clean-code.jpg",
+  "categoryId": 1,
+  "categoryName": "Software"
 }
 ```
 
@@ -166,8 +284,12 @@ Request:
   "author": "Robert C. Martin",
   "isbn": "9780132350884",
   "publishedYear": 2008,
-  "category": "Software",
-  "description": "Updated description."
+  "publisher": "Prentice Hall",
+  "language": "English",
+  "pageCount": 464,
+  "description": "Updated description.",
+  "coverImageUrl": "/images/books/clean-code.jpg",
+  "categoryId": 1
 }
 ```
 
@@ -180,8 +302,13 @@ Response (200):
   "author": "Robert C. Martin",
   "isbn": "9780132350884",
   "publishedYear": 2008,
-  "category": "Software",
-  "description": "Updated description."
+  "publisher": "Prentice Hall",
+  "language": "English",
+  "pageCount": 464,
+  "description": "Updated description.",
+  "coverImageUrl": "/images/books/clean-code.jpg",
+  "categoryId": 1,
+  "categoryName": "Software"
 }
 ```
 
@@ -191,6 +318,42 @@ Authorization:
 - Admin or Librarian
 
 Response (204)
+
+### POST /api/books/import
+
+Authorization:
+- Admin or Librarian
+
+Request:
+
+```json
+{
+  "source": "external-api",
+  "externalBookId": "OL12345W"
+}
+```
+
+Response (201):
+
+```json
+{
+  "id": 25,
+  "title": "Imported Book",
+  "author": "Example Author",
+  "isbn": "9780000000000",
+  "publishedYear": 2020,
+  "publisher": "Example Publisher",
+  "language": "English",
+  "pageCount": 300,
+  "description": "Imported from external source.",
+  "coverImageUrl": "/images/books/imported-book.jpg",
+  "categoryId": 2,
+  "categoryName": "Science Fiction"
+}
+```
+
+Notes:
+- This endpoint is optional and can be used if book metadata is fetched from an external source.
 
 ---
 
