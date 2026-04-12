@@ -162,6 +162,13 @@ Notes:
 
 ## Books
 
+Stock summary fields:
+- `total`: total number of physical copies
+- `available`: copies ready to be borrowed
+- `loaned`: copies currently borrowed
+- `reserved`: copies reserved for users
+- `pendingReturnApproval`: copies physically returned by user but waiting for librarian/admin approval
+
 ### GET /api/books
 
 Query params:
@@ -211,6 +218,8 @@ Response (200):
 
 Response (200):
 
+Response (200):
+
 ```json
 {
   "id": 1,
@@ -226,7 +235,14 @@ Response (200):
   "categoryId": 1,
   "categoryName": "Software",
   "availableCopyCount": 2,
-  "totalCopyCount": 3
+  "totalCopyCount": 3,
+  "stockSummary": {
+    "total": 3,
+    "available": 2,
+    "loaned": 1,
+    "reserved": 0,
+    "pendingReturnApproval": 0
+  }
 }
 ```
 
