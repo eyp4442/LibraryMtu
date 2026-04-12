@@ -1,4 +1,4 @@
-# Library System API Contract (v0.2)
+# Library System API Contract (v0.3)
 
 ## Conventions
 - Base path: `/api`
@@ -6,6 +6,11 @@
 - Auth: `Authorization: Bearer <accessToken>`
 - API date format: ISO-8601 (örnek: `2026-04-11T12:34:56Z`)
 - UI display date format: `dd.MM.yyyy HH:mm`
+
+## Roles
+- `Admin`: full system access, user and role management
+- `Librarian`: library operations such as books, copies, members, loans and return approval
+- `User`: book search, reservations and own loan tracking
 
 ## Standard Error Format
 All errors use:
@@ -49,6 +54,11 @@ Response (200):
   "role": "Admin"
 }
 ```
+
+Possible role values:
+- `Admin`
+- `Librarian`
+- `User`
 
 Notes:
 - Hatalı kullanıcı adı veya şifre durumunda `401 Unauthorized` döner.
@@ -114,7 +124,7 @@ Response (200):
 ### POST /api/books
 
 Authorization:
-- Admin only
+- Admin or Librarian
 
 Request:
 
@@ -146,7 +156,7 @@ Response (201):
 ### PUT /api/books/{id}
 
 Authorization:
-- Admin only
+- Admin or Librarian
 
 Request:
 
@@ -178,7 +188,7 @@ Response (200):
 ### DELETE /api/books/{id}
 
 Authorization:
-- Admin only
+- Admin or Librarian
 
 Response (204)
 
@@ -189,7 +199,7 @@ Response (204)
 ### GET /api/books/{bookId}/copies
 
 Authorization:
-- Admin only
+- Admin or Librarian
 
 Response (200):
 
@@ -215,7 +225,7 @@ Response (200):
 ### POST /api/books/{bookId}/copies
 
 Authorization:
-- Admin only
+- Admin or Librarian
 
 Request:
 
@@ -239,7 +249,7 @@ Response (201):
 ### DELETE /api/copies/{copyId}
 
 Authorization:
-- Admin only
+- Admin or Librarian
 
 Response (204)
 
@@ -259,7 +269,7 @@ Book copy status values:
 ### GET /api/members
 
 Authorization:
-- Admin only
+- Admin or Librarian
 
 Response (200):
 
@@ -280,7 +290,7 @@ Response (200):
 ### GET /api/members/{id}
 
 Authorization:
-- Admin only
+- Admin or Librarian
 
 Response (200):
 
@@ -297,7 +307,7 @@ Response (200):
 ### POST /api/members
 
 Authorization:
-- Admin only
+- Admin or Librarian
 
 Request:
 
@@ -325,7 +335,7 @@ Response (201):
 ### PUT /api/members/{id}
 
 Authorization:
-- Admin only
+- Admin or Librarian
 
 Request:
 
@@ -353,7 +363,7 @@ Response (200):
 ### DELETE /api/members/{id}
 
 Authorization:
-- Admin only
+- Admin or Librarian
 
 Response (204)
 
@@ -370,7 +380,7 @@ Loan status values:
 ### POST /api/loans/checkout
 
 Authorization:
-- Admin only
+- Admin or Librarian
 
 Request:
 
@@ -439,7 +449,7 @@ Rules:
 ### POST /api/loans/{id}/approve-return
 
 Authorization:
-- Admin only
+- Admin or Librarian
 
 Response (200):
 
@@ -459,13 +469,13 @@ Response (200):
 
 Rules:
 - Loan status must be `ReturnPendingApproval`
-- Physical copy is confirmed by admin/librarian
+- Physical copy is confirmed by admin or librarian
 - Related copy status becomes `Available`
 
 ### POST /api/loans/{id}/reject-return
 
 Authorization:
-- Admin only
+- Admin or Librarian
 
 Request:
 
@@ -526,7 +536,7 @@ Rules:
 ### POST /api/loans/return
 
 Authorization:
-- Admin only
+- Admin or Librarian
 
 Request:
 
@@ -553,13 +563,13 @@ Response (200):
 ```
 
 Notes:
-- This is a direct return flow for admin-side operation.
+- This is a direct return flow for admin-side or librarian-side operation.
 - If return approval workflow is used, system should prefer `request-return` and `approve-return`.
 
 ### GET /api/loans/overdue
 
 Authorization:
-- Admin only
+- Admin or Librarian
 
 Response (200):
 
@@ -658,5 +668,86 @@ Response (200):
       "status": "Active"
     }
   ]
+}
+```
+
+---
+
+## User Management
+
+### GET /api/users
+
+Authorization:
+- Admin only
+
+Response (200):
+
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "username": "admin",
+      "role": "Admin"
+    },
+    {
+      "id": 2,
+      "username": "librarian1",
+      "role": "Librarian"
+    },
+    {
+      "id": 3,
+      "username": "user1",
+      "role": "User"
+    }
+  ]
+}
+```
+
+### POST /api/users
+
+Authorization:
+- Admin only
+
+Request:
+
+```json
+{
+  "username": "librarian1",
+  "password": "123456",
+  "role": "Librarian"
+}
+```
+
+Response (201):
+
+```json
+{
+  "id": 2,
+  "username": "librarian1",
+  "role": "Librarian"
+}
+```
+
+### PUT /api/users/{id}/role
+
+Authorization:
+- Admin only
+
+Request:
+
+```json
+{
+  "role": "Librarian"
+}
+```
+
+Response (200):
+
+```json
+{
+  "id": 2,
+  "username": "librarian1",
+  "role": "Librarian"
 }
 ```
