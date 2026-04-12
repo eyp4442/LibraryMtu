@@ -1,4 +1,4 @@
-# Library System API Contract (v0.1)
+# Library System API Contract (v0.2)
 
 ## Conventions
 - Base path: `/api`
@@ -70,6 +70,9 @@ Query params:
 - `query` (optional)
 - `page` (default: 1)
 - `pageSize` (default: 20)
+- `category` (optional)
+- `author` (optional)
+- `availableOnly` (optional)
 
 Response (200):
 
@@ -198,6 +201,12 @@ Response (200):
       "bookId": 1,
       "barcode": "BC-00010",
       "status": "Available"
+    },
+    {
+      "id": 11,
+      "bookId": 1,
+      "barcode": "BC-00011",
+      "status": "PendingReturnApproval"
     }
   ]
 }
@@ -236,8 +245,11 @@ Response (204)
 
 Book copy status values:
 - `Available`
+- `Reserved`
 - `Loaned`
+- `PendingReturnApproval`
 - `Lost`
+- `Damaged`
 - `Maintenance`
 
 ---
@@ -349,6 +361,12 @@ Response (204)
 
 ## Loans
 
+Loan status values:
+- `Active`
+- `ReturnPendingApproval`
+- `Returned`
+- `Overdue`
+
 ### POST /api/loans/checkout
 
 Authorization:
@@ -374,13 +392,136 @@ Response (201):
   "loanDate": "2026-04-11T12:00:00Z",
   "dueDate": "2026-05-01T00:00:00Z",
   "returnDate": null,
-  "status": "Active"
+  "status": "Active",
+  "renewCount": 0,
+  "returnRequestedAt": null
 }
 ```
 
 Rules:
 - Copy status must be `Available`
 - Member must exist
+
+### POST /api/me/loans/{id}/request-return
+
+Authorization:
+- User
+
+Request:
+
+```json
+{
+  "note": "Book was left at the front desk."
+}
+```
+
+Response (200):
+
+```json
+{
+  "id": 100,
+  "memberId": 1,
+  "copyId": 10,
+  "loanDate": "2026-04-11T12:00:00Z",
+  "dueDate": "2026-05-01T00:00:00Z",
+  "returnDate": null,
+  "status": "ReturnPendingApproval",
+  "renewCount": 0,
+  "returnRequestedAt": "2026-04-20T09:30:00Z"
+}
+```
+
+Rules:
+- Loan must belong to current user
+- Loan status must be `Active`
+- System does not mark book as fully returned yet
+
+### POST /api/loans/{id}/approve-return
+
+Authorization:
+- Admin only
+
+Response (200):
+
+```json
+{
+  "id": 100,
+  "memberId": 1,
+  "copyId": 10,
+  "loanDate": "2026-04-11T12:00:00Z",
+  "dueDate": "2026-05-01T00:00:00Z",
+  "returnDate": "2026-04-20T10:00:00Z",
+  "status": "Returned",
+  "renewCount": 0,
+  "returnRequestedAt": "2026-04-20T09:30:00Z"
+}
+```
+
+Rules:
+- Loan status must be `ReturnPendingApproval`
+- Physical copy is confirmed by admin/librarian
+- Related copy status becomes `Available`
+
+### POST /api/loans/{id}/reject-return
+
+Authorization:
+- Admin only
+
+Request:
+
+```json
+{
+  "reason": "Physical copy was not found."
+}
+```
+
+Response (200):
+
+```json
+{
+  "id": 100,
+  "memberId": 1,
+  "copyId": 10,
+  "loanDate": "2026-04-11T12:00:00Z",
+  "dueDate": "2026-05-01T00:00:00Z",
+  "returnDate": null,
+  "status": "Active",
+  "renewCount": 0,
+  "returnRequestedAt": null
+}
+```
+
+Rules:
+- Loan status must be `ReturnPendingApproval`
+- Loan returns to `Active`
+
+### POST /api/me/loans/{id}/renew
+
+Authorization:
+- User
+
+Response (200):
+
+```json
+{
+  "id": 100,
+  "memberId": 1,
+  "copyId": 10,
+  "loanDate": "2026-04-11T12:00:00Z",
+  "dueDate": "2026-05-15T00:00:00Z",
+  "returnDate": null,
+  "status": "Active",
+  "renewCount": 1,
+  "returnRequestedAt": null
+}
+```
+
+Rules:
+- Loan must belong to current user
+- Loan status must be `Active`
+- Overdue loans cannot be renewed
+- Renew is not allowed if there is an active reservation for the same book
+- Maximum renew count can be limited (example: 2)
 
 ### POST /api/loans/return
 
@@ -405,9 +546,15 @@ Response (200):
   "loanDate": "2026-04-11T12:00:00Z",
   "dueDate": "2026-05-01T00:00:00Z",
   "returnDate": "2026-04-20T10:00:00Z",
-  "status": "Returned"
+  "status": "Returned",
+  "renewCount": 0,
+  "returnRequestedAt": null
 }
 ```
+
+Notes:
+- This is a direct return flow for admin-side operation.
+- If return approval workflow is used, system should prefer `request-return` and `approve-return`.
 
 ### GET /api/loans/overdue
 
@@ -426,7 +573,9 @@ Response (200):
       "loanDate": "2026-03-01T10:00:00Z",
       "dueDate": "2026-03-15T10:00:00Z",
       "returnDate": null,
-      "status": "Active"
+      "status": "Overdue",
+      "renewCount": 1,
+      "returnRequestedAt": null
     }
   ]
 }
@@ -449,7 +598,9 @@ Response (200):
       "loanDate": "2026-04-11T12:00:00Z",
       "dueDate": "2026-05-01T00:00:00Z",
       "returnDate": null,
-      "status": "Active"
+      "status": "Active",
+      "renewCount": 0,
+      "returnRequestedAt": null
     }
   ]
 }
