@@ -1,6 +1,7 @@
 using Library.Api.Data;
 using Library.Api.DTOs.Categories;
 using Library.Api.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,6 +9,7 @@ namespace Library.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Roles = "Admin,Librarian")]
     public class CategoriesController : ControllerBase
     {
         private readonly LibraryDbContext _context;
@@ -17,6 +19,7 @@ namespace Library.Api.Controllers
             _context = context;
         }
 
+        [AllowAnonymous]
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -32,6 +35,7 @@ namespace Library.Api.Controllers
             return Ok(new { items });
         }
 
+        [AllowAnonymous]
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(int id)
         {
@@ -45,6 +49,7 @@ namespace Library.Api.Controllers
                 .FirstOrDefaultAsync();
 
             if (category == null)
+            {
                 return NotFound(new
                 {
                     error = new
@@ -53,6 +58,7 @@ namespace Library.Api.Controllers
                         message = "Category not found"
                     }
                 });
+            }
 
             return Ok(category);
         }

@@ -12,7 +12,10 @@ namespace Library.Api.DTOs.Loans
         public int RenewCount { get; set; }
         public DateTime? ReturnRequestedAt { get; set; }
     }
-
+    public class RequestReturnDto
+    {
+        public string Note { get; set; } = string.Empty;
+    }
     public class CheckoutLoanDto
     {
         public int MemberId { get; set; }

@@ -1,6 +1,7 @@
 using Library.Api.Data;
 using Library.Api.DTOs.Loans;
 using Library.Api.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,6 +9,7 @@ namespace Library.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Roles = "Admin,Librarian")]
     public class LoansController : ControllerBase
     {
         private readonly LibraryDbContext _context;
@@ -28,10 +30,10 @@ namespace Library.Api.Controllers
                     {
                         code = "VALIDATION_ERROR",
                         message = "Validation failed",
-                        details = new object[]
+                        details = new object?[]
                         {
-                            dto.MemberId <= 0 ? new { field = "memberId", message = "Must be greater than 0" } : null!,
-                            dto.CopyId <= 0 ? new { field = "copyId", message = "Must be greater than 0" } : null!
+                            dto.MemberId <= 0 ? new { field = "memberId", message = "Must be greater than 0" } : null,
+                            dto.CopyId <= 0 ? new { field = "copyId", message = "Must be greater than 0" } : null
                         }.Where(x => x != null)
                     }
                 });
@@ -91,7 +93,31 @@ namespace Library.Api.Controllers
             _context.Loans.Add(loan);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetOverdue), new { }, MapLoan(loan));
+            return Created($"/api/loans/{loan.Id}", MapLoan(loan));
+        }
+
+        [HttpGet("pending-return")]
+        public async Task<IActionResult> GetPendingReturn()
+        {
+            var items = await _context.Loans
+                .AsNoTracking()
+                .Where(x => x.Status == LoanStatus.ReturnPendingApproval)
+                .OrderBy(x => x.ReturnRequestedAt)
+                .Select(x => new LoanItemDto
+                {
+                    Id = x.Id,
+                    MemberId = x.MemberId,
+                    CopyId = x.CopyId,
+                    LoanDate = x.LoanDate,
+                    DueDate = x.DueDate,
+                    ReturnDate = x.ReturnDate,
+                    Status = x.Status.ToString(),
+                    RenewCount = x.RenewCount,
+                    ReturnRequestedAt = x.ReturnRequestedAt
+                })
+                .ToListAsync();
+
+            return Ok(new { items });
         }
 
         [HttpPost("{id:int}/approve-return")]
@@ -283,7 +309,7 @@ namespace Library.Api.Controllers
         {
             var now = DateTime.UtcNow;
 
-            var loans = await _context.Loans
+            var items = await _context.Loans
                 .AsNoTracking()
                 .Where(x => x.ReturnDate == null && x.DueDate < now)
                 .OrderBy(x => x.DueDate)
@@ -301,14 +327,16 @@ namespace Library.Api.Controllers
                 })
                 .ToListAsync();
 
-            return Ok(new { items = loans });
+            return Ok(new { items });
         }
 
         private static LoanItemDto MapLoan(Loan loan)
         {
             var status = loan.Status;
 
-            if (loan.ReturnDate == null && loan.DueDate < DateTime.UtcNow && loan.Status == LoanStatus.Active)
+            if (loan.ReturnDate == null &&
+                loan.DueDate < DateTime.UtcNow &&
+                loan.Status == LoanStatus.Active)
             {
                 status = LoanStatus.Overdue;
             }
