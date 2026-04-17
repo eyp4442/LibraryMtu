@@ -1,6 +1,7 @@
 using Library.Api.Data;
 using Library.Api.DTOs.Books;
 using Library.Api.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,6 +9,7 @@ namespace Library.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Roles = "Admin,Librarian")]
     public class BooksController : ControllerBase
     {
         private readonly LibraryDbContext _context;
@@ -17,6 +19,7 @@ namespace Library.Api.Controllers
             _context = context;
         }
 
+        [AllowAnonymous]
         [HttpGet]
         public async Task<IActionResult> GetAll(
             [FromQuery] string? query,
@@ -155,6 +158,7 @@ namespace Library.Api.Controllers
             });
         }
 
+        [AllowAnonymous]
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(int id)
         {
