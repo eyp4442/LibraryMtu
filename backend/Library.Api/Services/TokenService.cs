@@ -1,5 +1,6 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 using Library.Api.Interfaces;
 using Library.Api.Models;
@@ -36,7 +37,8 @@ namespace Library.Api.Services
                 new Claim(JwtRegisteredClaimNames.Sub, user.Id),
                 new Claim(ClaimTypes.NameIdentifier, user.Id),
                 new Claim(ClaimTypes.Name, user.UserName ?? string.Empty),
-                new Claim(JwtRegisteredClaimNames.UniqueName, user.UserName ?? string.Empty)
+                new Claim(JwtRegisteredClaimNames.UniqueName, user.UserName ?? string.Empty),
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
             };
 
             if (!string.IsNullOrWhiteSpace(user.Email))
@@ -61,6 +63,36 @@ namespace Library.Api.Services
             );
 
             return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+        public string CreateRefreshToken()
+        {
+            var bytes = RandomNumberGenerator.GetBytes(64);
+            return Base64UrlEncoder.Encode(bytes);
+        }
+
+        public string HashToken(string token)
+        {
+            var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
+            return Convert.ToHexString(bytes);
+        }
+
+        public DateTime GetRefreshTokenExpiryUtc()
+        {
+            var days = int.TryParse(_configuration["Jwt:RefreshTokenExpiresInDays"], out var parsedDays)
+                ? parsedDays
+                : 7;
+
+            return DateTime.UtcNow.AddDays(days);
+        }
+
+        public int GetAccessTokenExpiresInSeconds()
+        {
+            var minutes = int.TryParse(_configuration["Jwt:ExpiresInMinutes"], out var parsedMinutes)
+                ? parsedMinutes
+                : 60;
+
+            return minutes * 60;
         }
     }
 }
