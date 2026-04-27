@@ -17,6 +17,7 @@ namespace Library.Api.Data
         public DbSet<Member> Members => Set<Member>();
         public DbSet<Loan> Loans => Set<Loan>();
         public DbSet<Reservation> Reservations => Set<Reservation>();
+        public DbSet<RegistrationRequest> RegistrationRequests => Set<RegistrationRequest>();
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -94,6 +95,21 @@ namespace Library.Api.Data
                 .Property(x => x.Status)
                 .HasConversion<string>()
                 .HasMaxLength(50);
+
+            builder.Entity<RegistrationRequest>(entity =>
+{
+    entity.Property(x => x.FullName).IsRequired().HasMaxLength(150);
+    entity.Property(x => x.Email).IsRequired().HasMaxLength(150);
+    entity.Property(x => x.Username).IsRequired().HasMaxLength(100);
+    entity.Property(x => x.PasswordHash).IsRequired();
+    entity.Property(x => x.Phone).IsRequired().HasMaxLength(30);
+    entity.Property(x => x.Address).IsRequired().HasMaxLength(300);
+    entity.Property(x => x.RejectReason).HasMaxLength(500);
+
+    entity.HasIndex(x => x.Email);
+    entity.HasIndex(x => x.Username);
+    entity.HasIndex(x => x.Status);
+});
         }
     }
 }
