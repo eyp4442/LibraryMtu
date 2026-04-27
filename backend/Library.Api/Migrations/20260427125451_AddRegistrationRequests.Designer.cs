@@ -4,6 +4,7 @@ using Library.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Library.Api.Migrations
 {
     [DbContext(typeof(LibraryDbContext))]
-    partial class LibraryDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260427125451_AddRegistrationRequests")]
+    partial class AddRegistrationRequests
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -271,50 +274,6 @@ namespace Library.Api.Migrations
                     b.ToTable("Members");
                 });
 
-            modelBuilder.Entity("Library.Api.Models.RefreshToken", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("ReasonRevoked")
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("ReplacedByTokenHash")
-                        .HasColumnType("longtext");
-
-                    b.Property<DateTime?>("RevokedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("TokenHash")
-                        .IsRequired()
-                        .HasMaxLength(128)
-                        .HasColumnType("varchar(128)");
-
-                    b.Property<string>("UserId")
-                        .IsRequired()
-                        .HasColumnType("varchar(255)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ExpiresAt");
-
-                    b.HasIndex("TokenHash")
-                        .IsUnique();
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("RefreshTokens");
-                });
-
             modelBuilder.Entity("Library.Api.Models.RegistrationRequest", b =>
                 {
                     b.Property<int>("Id")
@@ -408,41 +367,6 @@ namespace Library.Api.Migrations
                     b.HasIndex("MemberId");
 
                     b.ToTable("Reservations");
-                });
-
-            modelBuilder.Entity("Library.Api.Models.RevokedAccessToken", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("ExpiresAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("Jti")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar(100)");
-
-                    b.Property<string>("Reason")
-                        .HasColumnType("longtext");
-
-                    b.Property<DateTime>("RevokedAt")
-                        .HasColumnType("datetime(6)");
-
-                    b.Property<string>("UserId")
-                        .HasColumnType("longtext");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ExpiresAt");
-
-                    b.HasIndex("Jti")
-                        .IsUnique();
-
-                    b.ToTable("RevokedAccessTokens");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
@@ -624,17 +548,6 @@ namespace Library.Api.Migrations
                         .WithOne("Member")
                         .HasForeignKey("Library.Api.Models.Member", "UserId")
                         .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("Library.Api.Models.RefreshToken", b =>
-                {
-                    b.HasOne("Library.Api.Models.ApplicationUser", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
 
                     b.Navigation("User");
                 });

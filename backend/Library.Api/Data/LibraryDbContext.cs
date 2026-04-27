@@ -17,6 +17,9 @@ namespace Library.Api.Data
         public DbSet<Member> Members => Set<Member>();
         public DbSet<Loan> Loans => Set<Loan>();
         public DbSet<Reservation> Reservations => Set<Reservation>();
+        public DbSet<RegistrationRequest> RegistrationRequests => Set<RegistrationRequest>();
+        public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+        public DbSet<RevokedAccessToken> RevokedAccessTokens => Set<RevokedAccessToken>();
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -94,6 +97,44 @@ namespace Library.Api.Data
                 .Property(x => x.Status)
                 .HasConversion<string>()
                 .HasMaxLength(50);
+
+            builder.Entity<RegistrationRequest>(entity =>
+{
+    entity.Property(x => x.FullName).IsRequired().HasMaxLength(150);
+    entity.Property(x => x.Email).IsRequired().HasMaxLength(150);
+    entity.Property(x => x.Username).IsRequired().HasMaxLength(100);
+    entity.Property(x => x.PasswordHash).IsRequired();
+    entity.Property(x => x.Phone).IsRequired().HasMaxLength(30);
+    entity.Property(x => x.Address).IsRequired().HasMaxLength(300);
+    entity.Property(x => x.RejectReason).HasMaxLength(500);
+
+    entity.HasIndex(x => x.Email);
+    entity.HasIndex(x => x.Username);
+    entity.HasIndex(x => x.Status);
+});
+
+        builder.Entity<RefreshToken>(entity =>
+{
+    entity.Property(x => x.TokenHash).IsRequired().HasMaxLength(128);
+    entity.Property(x => x.UserId).IsRequired();
+
+    entity.HasIndex(x => x.TokenHash).IsUnique();
+    entity.HasIndex(x => x.UserId);
+    entity.HasIndex(x => x.ExpiresAt);
+
+    entity.HasOne(x => x.User)
+        .WithMany()
+        .HasForeignKey(x => x.UserId)
+        .OnDelete(DeleteBehavior.Cascade);
+});
+
+        builder.Entity<RevokedAccessToken>(entity =>
+{
+    entity.Property(x => x.Jti).IsRequired().HasMaxLength(100);
+
+    entity.HasIndex(x => x.Jti).IsUnique();
+    entity.HasIndex(x => x.ExpiresAt);
+});
         }
     }
 }

@@ -7,6 +7,11 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using Microsoft.OpenApi.Models;
+using Microsoft.IdentityModel.JsonWebTokens;
+using JwtClaimNames = Microsoft.IdentityModel.JsonWebTokens.JwtRegisteredClaimNames;
+using System.Security.Claims;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -42,6 +47,7 @@ var jwtAudience = builder.Configuration["Jwt:Audience"]
 
 var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
 
+
 builder.Services
     .AddAuthentication(options =>
     {
@@ -50,6 +56,8 @@ builder.Services
     })
     .AddJwtBearer(options =>
     {
+        options.MapInboundClaims = false;
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -59,16 +67,63 @@ builder.Services
             ValidIssuer = jwtIssuer,
             ValidAudience = jwtAudience,
             IssuerSigningKey = signingKey,
-            ClockSkew = TimeSpan.Zero
+            ClockSkew = TimeSpan.Zero,
+            NameClaimType = JwtClaimNames.UniqueName,
+            RoleClaimType = ClaimTypes.Role
         };
-    });
+
+        options.Events = new JwtBearerEvents
+        {
+            OnAuthenticationFailed = context =>
+            {
+                Console.WriteLine("JWT AUTH FAILED");
+                Console.WriteLine(context.Exception.GetType().FullName);
+                Console.WriteLine(context.Exception.Message);
+                Console.WriteLine(context.Exception.ToString());
+                return Task.CompletedTask;
+            }
+        };
+                    
+    }); 
 
 builder.Services.AddAuthorization();
 
 builder.Services.AddScoped<ITokenService, TokenService>();
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Library.Api",
+        Version = "v1"
+    });
+
+    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Name = "Authorization",
+        Description = "JWT Authorization header. Example: Bearer {token}",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT"
+    });
+
+    options.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Id = "Bearer",
+                    Type = ReferenceType.SecurityScheme
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
 
 builder.Services.AddCors(options =>
 {
