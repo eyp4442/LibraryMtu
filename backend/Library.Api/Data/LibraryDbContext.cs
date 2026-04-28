@@ -10,7 +10,7 @@ namespace Library.Api.Data
         public LibraryDbContext(DbContextOptions<LibraryDbContext> options) : base(options)
         {
         }
-
+        public DbSet<EmailChangeRequest> EmailChangeRequests => Set<EmailChangeRequest>();
         public DbSet<Category> Categories => Set<Category>();
         public DbSet<Book> Books => Set<Book>();
         public DbSet<BookCopy> BookCopies => Set<BookCopy>();
@@ -111,6 +111,24 @@ namespace Library.Api.Data
     entity.HasIndex(x => x.Email);
     entity.HasIndex(x => x.Username);
     entity.HasIndex(x => x.Status);
+});
+
+        builder.Entity<EmailChangeRequest>(entity =>
+{
+    entity.Property(x => x.UserId).IsRequired();
+    entity.Property(x => x.CurrentEmail).IsRequired().HasMaxLength(150);
+    entity.Property(x => x.NewEmail).IsRequired().HasMaxLength(150);
+    entity.Property(x => x.RejectReason).HasMaxLength(500);
+
+    entity.HasIndex(x => x.MemberId);
+    entity.HasIndex(x => x.UserId);
+    entity.HasIndex(x => x.NewEmail);
+    entity.HasIndex(x => x.Status);
+
+    entity.HasOne(x => x.Member)
+        .WithMany()
+        .HasForeignKey(x => x.MemberId)
+        .OnDelete(DeleteBehavior.Cascade);
 });
 
         builder.Entity<RefreshToken>(entity =>

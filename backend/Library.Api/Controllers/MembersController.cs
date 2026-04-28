@@ -1,6 +1,7 @@
 using Library.Api.Data;
 using Library.Api.DTOs.Members;
 using Library.Api.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,6 +9,7 @@ namespace Library.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize(Roles = "Admin,Librarian")]
     public class MembersController : ControllerBase
     {
         private readonly LibraryDbContext _context;
