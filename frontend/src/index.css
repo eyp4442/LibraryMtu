@@ -1,0 +1,39 @@
+:root {
+  --primary-color: #2c3e50;
+  --secondary-color: #34495e;
+  --accent-color: #3498db;
+  --success-color: #27ae60;
+  --danger-color: #e74c3c;
+  --bg-color: #f8f9fa;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  /* Kütüphane havası veren hafif bir doku veya soft bir gri */
+  background-color: var(--bg-color);
+  color: #333;
+}
+
+/* Tüm butonlara genel bir modernlik katalım */
+button {
+  transition: all 0.3s ease;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  opacity: 0.9;
+}
+
+/* Kart tasarımları için ortak class */
+.card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.05);
+  padding: 20px;
+  border: 1px solid rgba(0,0,0,0.05);
+}
