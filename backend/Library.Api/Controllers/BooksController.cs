@@ -9,6 +9,9 @@ namespace Library.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+
+    // Controller genel olarak Admin ve Librarian rollerine kapalıdır.
+    // Sadece okuma endpoint'leri AllowAnonymous ile herkese açılmıştır.
     [Authorize(Roles = "Admin,Librarian")]
     public class BooksController : ControllerBase
     {
@@ -19,6 +22,8 @@ namespace Library.Api.Controllers
             _context = context;
         }
 
+        // Kitapları listeler.
+        // Ziyaretçiler dahil herkes kitap listesini, filtreleme ve sayfalama ile görüntüleyebilir.
         [AllowAnonymous]
         [HttpGet]
         public async Task<IActionResult> GetAll(
@@ -39,12 +44,15 @@ namespace Library.Api.Controllers
             if (page <= 0) page = 1;
             if (pageSize <= 0) pageSize = 20;
 
+            // Listeleme sadece okuma amaçlıdır.
+            // Category ve Copies bilgileri stok ve kategori response'u için dahil edilir.
             var booksQuery = _context.Books
                 .AsNoTracking()
                 .Include(x => x.Category)
                 .Include(x => x.Copies)
                 .AsQueryable();
 
+            // Genel arama alanı; title, author, ISBN ve publisher üzerinde arama yapar.
             if (!string.IsNullOrWhiteSpace(query))
             {
                 var q = query.Trim().ToLower();
@@ -95,6 +103,7 @@ namespace Library.Api.Controllers
                 booksQuery = booksQuery.Where(x => x.Language.ToLower().Contains(value));
             }
 
+            // Sadece en az bir müsait fiziksel kopyası olan kitapları listeler.
             if (availableOnly == true)
             {
                 booksQuery = booksQuery.Where(x => x.Copies.Any(c => c.Status == BookCopyStatus.Available));
@@ -102,6 +111,7 @@ namespace Library.Api.Controllers
 
             var isDescending = string.Equals(sortDirection, "desc", StringComparison.OrdinalIgnoreCase);
 
+            // Kullanıcı title, author veya publishedYear alanına göre sıralama yapabilir.
             booksQuery = (sortBy ?? "title").ToLower() switch
             {
                 "publishedyear" => isDescending
@@ -119,6 +129,7 @@ namespace Library.Api.Controllers
 
             var total = await booksQuery.CountAsync();
 
+            // Sayfalama uygulanır ve Book entity'leri frontend'e DTO olarak döndürülür.
             var items = await booksQuery
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
@@ -158,6 +169,8 @@ namespace Library.Api.Controllers
             });
         }
 
+        // Tek bir kitabın detay bilgisini döndürür.
+        // Kitap detayında kategori ve stok özeti de yer alır.
         [AllowAnonymous]
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(int id)
@@ -209,16 +222,29 @@ namespace Library.Api.Controllers
             return Ok(book);
         }
 
+        // Yeni kitap kaydı oluşturur.
+        // Kitap oluşturma işlemi sadece Admin ve Librarian rollerine açıktır.
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateBookDto dto)
         {
-            var validationError = ValidateBookDto(dto.Title, dto.Author, dto.Isbn, dto.PublishedYear, dto.Publisher, dto.Language, dto.PageCount, dto.CategoryId);
+            var validationError = ValidateBookDto(
+                dto.Title,
+                dto.Author,
+                dto.Isbn,
+                dto.PublishedYear,
+                dto.Publisher,
+                dto.Language,
+                dto.PageCount,
+                dto.CategoryId);
+
             if (validationError != null)
                 return validationError;
 
             var normalizedIsbn = dto.Isbn.Trim();
 
+            // Kitabın geçerli bir kategoriye bağlı olması gerekir.
             var categoryExists = await _context.Categories.AnyAsync(x => x.Id == dto.CategoryId);
+
             if (!categoryExists)
             {
                 return BadRequest(new
@@ -231,7 +257,9 @@ namespace Library.Api.Controllers
                 });
             }
 
+            // ISBN benzersiz kabul edilir; aynı ISBN ile ikinci kitap oluşturulamaz.
             var isbnExists = await _context.Books.AnyAsync(x => x.Isbn == normalizedIsbn);
+
             if (isbnExists)
             {
                 return BadRequest(new
@@ -266,6 +294,7 @@ namespace Library.Api.Controllers
                 .Select(x => x.Name)
                 .FirstAsync();
 
+            // Yeni oluşturulan kitabın henüz fiziksel kopyası olmadığı için stok bilgileri sıfır döner.
             var response = new BookDetailDto
             {
                 Id = book.Id,
@@ -288,14 +317,26 @@ namespace Library.Api.Controllers
             return CreatedAtAction(nameof(GetById), new { id = book.Id }, response);
         }
 
+        // Mevcut kitap kaydını günceller.
+        // ISBN güncellenirken başka bir kitapta aynı ISBN olup olmadığı ayrıca kontrol edilir.
         [HttpPut("{id:int}")]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateBookDto dto)
         {
-            var validationError = ValidateBookDto(dto.Title, dto.Author, dto.Isbn, dto.PublishedYear, dto.Publisher, dto.Language, dto.PageCount, dto.CategoryId);
+            var validationError = ValidateBookDto(
+                dto.Title,
+                dto.Author,
+                dto.Isbn,
+                dto.PublishedYear,
+                dto.Publisher,
+                dto.Language,
+                dto.PageCount,
+                dto.CategoryId);
+
             if (validationError != null)
                 return validationError;
 
             var book = await _context.Books.FirstOrDefaultAsync(x => x.Id == id);
+
             if (book == null)
             {
                 return NotFound(new
@@ -309,6 +350,7 @@ namespace Library.Api.Controllers
             }
 
             var categoryExists = await _context.Categories.AnyAsync(x => x.Id == dto.CategoryId);
+
             if (!categoryExists)
             {
                 return BadRequest(new
@@ -356,6 +398,7 @@ namespace Library.Api.Controllers
                 .Select(x => x.Name)
                 .FirstAsync();
 
+            // Güncelleme response'unda mevcut fiziksel kopyaların güncel stok özeti de döndürülür.
             var copyCounts = await _context.BookCopies
                 .Where(x => x.BookId == book.Id)
                 .GroupBy(x => 1)
@@ -398,6 +441,8 @@ namespace Library.Api.Controllers
             return Ok(response);
         }
 
+        // Kitap kaydını siler.
+        // Kitaba bağlı fiziksel kopya veya rezervasyon varsa silme işlemi engellenir.
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int id)
         {
@@ -418,6 +463,8 @@ namespace Library.Api.Controllers
                 });
             }
 
+            // Fiziksel kopyası olan kitap silinmez.
+            // Önce ilgili kopyaların yönetilmesi gerekir.
             if (book.Copies.Any())
             {
                 return BadRequest(new
@@ -430,6 +477,8 @@ namespace Library.Api.Controllers
                 });
             }
 
+            // Rezervasyon geçmişi olan kitap silinmez.
+            // Bu kural rezervasyon kayıtlarının tutarlılığını korur.
             if (book.Reservations.Any())
             {
                 return BadRequest(new
@@ -448,6 +497,8 @@ namespace Library.Api.Controllers
             return NoContent();
         }
 
+        // Create ve Update işlemlerinde ortak kullanılan temel validation metodudur.
+        // Hata varsa standart error envelope formatında BadRequest döndürür.
         private IActionResult? ValidateBookDto(
             string title,
             string author,

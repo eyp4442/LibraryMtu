@@ -1,15 +1,18 @@
 namespace Library.Api.DTOs.EmailChangeRequests
 {
+    // Kullanıcının kendi panelinden yeni e-posta talebi oluştururken gönderdiği request modelidir.
     public class CreateEmailChangeRequestDto
     {
         public string NewEmail { get; set; } = string.Empty;
     }
 
+    // Admin veya Librarian tarafından e-posta değişiklik talebi reddedilirken kullanılan request modelidir.
     public class RejectEmailChangeRequestDto
     {
         public string Reason { get; set; } = string.Empty;
     }
 
+    // E-posta değişiklik taleplerini yönetim ekranında listelemek için kullanılan response DTO'su.
     public class EmailChangeRequestItemDto
     {
         public int Id { get; set; }

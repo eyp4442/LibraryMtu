@@ -17,6 +17,8 @@ namespace Library.Api.Controllers
             _context = context;
         }
 
+        // Yeni rezervasyon oluşturur.
+        // Aynı üyenin aynı kitap için birden fazla aktif rezervasyon oluşturması engellenir.
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateReservationDto dto)
         {
@@ -37,7 +39,9 @@ namespace Library.Api.Controllers
                 });
             }
 
+            // Rezervasyon oluşturmadan önce üyenin gerçekten var olduğu doğrulanır.
             var memberExists = await _context.Members.AnyAsync(x => x.Id == dto.MemberId);
+
             if (!memberExists)
             {
                 return BadRequest(new
@@ -50,7 +54,9 @@ namespace Library.Api.Controllers
                 });
             }
 
+            // Rezervasyonun geçerli bir kitaba bağlanması gerekir.
             var bookExists = await _context.Books.AnyAsync(x => x.Id == dto.BookId);
+
             if (!bookExists)
             {
                 return BadRequest(new
@@ -63,6 +69,7 @@ namespace Library.Api.Controllers
                 });
             }
 
+            // Aynı üyenin aynı kitap için ikinci bir aktif rezervasyon oluşturması engellenir.
             var alreadyReserved = await _context.Reservations.AnyAsync(x =>
                 x.MemberId == dto.MemberId &&
                 x.BookId == dto.BookId &&
@@ -103,6 +110,8 @@ namespace Library.Api.Controllers
             return CreatedAtAction(nameof(GetByMemberId), new { memberId = reservation.MemberId }, response);
         }
 
+        // Rezervasyon kaydını siler.
+        // Mevcut haliyle hard delete yapılır; geçmiş tutulmak istenirse status tabanlı iptal akışı eklenebilir.
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int id)
         {
@@ -126,10 +135,14 @@ namespace Library.Api.Controllers
             return NoContent();
         }
 
+        // Belirli bir üyeye ait rezervasyonları listeler.
+        // Route başındaki "/" nedeniyle bu endpoint controller route'una eklenmez,
+        // doğrudan /api/members/{memberId}/reservations olarak çalışır.
         [HttpGet("/api/members/{memberId:int}/reservations")]
         public async Task<IActionResult> GetByMemberId(int memberId)
         {
             var memberExists = await _context.Members.AnyAsync(x => x.Id == memberId);
+
             if (!memberExists)
             {
                 return NotFound(new

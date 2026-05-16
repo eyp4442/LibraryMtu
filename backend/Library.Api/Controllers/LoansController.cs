@@ -9,6 +9,9 @@ namespace Library.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+
+    // Loan yönetimi operasyonel bir görevdir.
+    // Bu controller sadece Admin ve Librarian rollerine açıktır.
     [Authorize(Roles = "Admin,Librarian")]
     public class LoansController : ControllerBase
     {
@@ -19,6 +22,8 @@ namespace Library.Api.Controllers
             _context = context;
         }
 
+        // Bir üyeye fiziksel kitap kopyası ödünç verir.
+        // İşlem sonunda Loan kaydı oluşturulur ve BookCopy durumu Loaned yapılır.
         [HttpPost("checkout")]
         public async Task<IActionResult> Checkout([FromBody] CheckoutLoanDto dto)
         {
@@ -40,6 +45,7 @@ namespace Library.Api.Controllers
             }
 
             var member = await _context.Members.FirstOrDefaultAsync(x => x.Id == dto.MemberId);
+
             if (member == null)
             {
                 return BadRequest(new
@@ -53,6 +59,7 @@ namespace Library.Api.Controllers
             }
 
             var copy = await _context.BookCopies.FirstOrDefaultAsync(x => x.Id == dto.CopyId);
+
             if (copy == null)
             {
                 return BadRequest(new
@@ -65,6 +72,7 @@ namespace Library.Api.Controllers
                 });
             }
 
+            // Aynı fiziksel kopya aynı anda yalnızca bir aktif loan içinde olabilir.
             if (copy.Status != BookCopyStatus.Available)
             {
                 return BadRequest(new
@@ -96,6 +104,7 @@ namespace Library.Api.Controllers
             return Created($"/api/loans/{loan.Id}", MapLoan(loan));
         }
 
+        // Kullanıcıların oluşturduğu ve görevli onayı bekleyen iade taleplerini listeler.
         [HttpGet("pending-return")]
         public async Task<IActionResult> GetPendingReturn()
         {
@@ -120,6 +129,8 @@ namespace Library.Api.Controllers
             return Ok(new { items });
         }
 
+        // Kullanıcının iade talebini onaylar.
+        // Onay sonrası Loan Returned olur ve fiziksel kopya tekrar Available durumuna alınır.
         [HttpPost("{id:int}/approve-return")]
         public async Task<IActionResult> ApproveReturn(int id)
         {
@@ -160,6 +171,8 @@ namespace Library.Api.Controllers
             return Ok(MapLoan(loan));
         }
 
+        // Kullanıcının iade talebini reddeder.
+        // Reddedilirse loan tekrar Active olur ve fiziksel kopya Loaned durumunda kalır.
         [HttpPost("{id:int}/reject-return")]
         public async Task<IActionResult> RejectReturn(int id, [FromBody] RejectReturnDto dto)
         {
@@ -200,6 +213,8 @@ namespace Library.Api.Controllers
             return Ok(MapLoan(loan));
         }
 
+        // Aktif ve gecikmemiş loan için süre uzatma işlemi yapar.
+        // Her loan en fazla iki kez uzatılabilir.
         [HttpPost("{id:int}/renew")]
         public async Task<IActionResult> Renew(int id)
         {
@@ -263,6 +278,8 @@ namespace Library.Api.Controllers
             return Ok(MapLoan(loan));
         }
 
+        // Görevlinin doğrudan iade alma işlemidir.
+        // Kullanıcı iade talebi oluşturmadan da loan iade edilmiş hale getirilebilir.
         [HttpPost("return")]
         public async Task<IActionResult> Return([FromBody] ReturnLoanDto dto)
         {
@@ -304,6 +321,7 @@ namespace Library.Api.Controllers
             return Ok(MapLoan(loan));
         }
 
+        // Son teslim tarihi geçmiş ve henüz iade edilmemiş loan kayıtlarını listeler.
         [HttpGet("overdue")]
         public async Task<IActionResult> GetOverdue()
         {
@@ -330,6 +348,8 @@ namespace Library.Api.Controllers
             return Ok(new { items });
         }
 
+        // Loan entity'sini frontend'e dönecek DTO formatına çevirir.
+        // Aktif loan gecikmişse response tarafında Overdue olarak gösterilir.
         private static LoanItemDto MapLoan(Loan loan)
         {
             var status = loan.Status;

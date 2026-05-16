@@ -1,5 +1,7 @@
 namespace Library.Api.DTOs.RegistrationRequests
 {
+    // Ziyaretçinin üyelik başvurusu oluştururken gönderdiği request DTO'su.
+    // Bu DTO AuthController içindeki register-request endpoint'inde kullanılır.
     public class CreateRegistrationRequestDto
     {
         public string FullName { get; set; } = string.Empty;
@@ -10,6 +12,7 @@ namespace Library.Api.DTOs.RegistrationRequests
         public string Address { get; set; } = string.Empty;
     }
 
+    // Admin/Librarian tarafında üyelik başvurularını listelemek ve görüntülemek için kullanılan response DTO'su.
     public class RegistrationRequestItemDto
     {
         public int Id { get; set; }
@@ -25,6 +28,7 @@ namespace Library.Api.DTOs.RegistrationRequests
         public string? RejectReason { get; set; }
     }
 
+    // Üyelik başvurusu reddedilirken opsiyonel ret sebebi almak için kullanılan request DTO'su.
     public class RejectRegistrationRequestDto
     {
         public string Reason { get; set; } = string.Empty;

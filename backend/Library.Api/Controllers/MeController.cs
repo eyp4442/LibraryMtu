@@ -14,6 +14,9 @@ namespace Library.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+
+    // Bu controller normal kullanıcıların kendi verilerini yönetmesi için tasarlanmıştır.
+    // Kullanıcılar burada yalnızca token üzerinden kendilerine bağlı Member kaydına erişebilir.
     [Authorize(Roles = "User")]
     public class MeController : ControllerBase
     {
@@ -28,6 +31,8 @@ namespace Library.Api.Controllers
             _userManager = userManager;
         }
 
+        // Giriş yapan kullanıcının kendi ödünç kayıtlarını listeler.
+        // Member bilgisi request body'den değil, JWT token üzerinden bulunur.
         [HttpGet("loans")]
         public async Task<IActionResult> GetMyLoans()
         {
@@ -58,6 +63,7 @@ namespace Library.Api.Controllers
             return Ok(new { items });
         }
 
+        // Giriş yapan kullanıcının kendi rezervasyon kayıtlarını listeler.
         [HttpGet("reservations")]
         public async Task<IActionResult> GetMyReservations()
         {
@@ -92,6 +98,8 @@ namespace Library.Api.Controllers
             return Ok(new { items });
         }
 
+        // Kullanıcının kendi profil bilgisini döndürür.
+        // Response içinde hem ApplicationUser hem de Member bilgileri birleştirilir.
         [HttpGet("profile")]
         public async Task<IActionResult> GetMyProfile()
         {
@@ -149,6 +157,8 @@ namespace Library.Api.Controllers
             return Ok(response);
         }
 
+        // Kullanıcının kendi profilindeki temel üye bilgilerini günceller.
+        // Email bu endpoint üzerinden değiştirilemez; email için ayrı onaylı talep akışı vardır.
         [HttpPut("profile")]
         public async Task<IActionResult> UpdateMyProfile([FromBody] UpdateMyProfileDto dto)
         {
@@ -217,6 +227,8 @@ namespace Library.Api.Controllers
             return Ok(response);
         }
 
+        // Kullanıcının email değişikliği talebi oluşturmasını sağlar.
+        // Talep doğrudan uygulanmaz; Admin/Librarian onayı bekleyen Pending kayıt oluşturulur.
         [HttpPost("email-change-request")]
         public async Task<IActionResult> CreateEmailChangeRequest([FromBody] CreateEmailChangeRequestDto dto)
         {
@@ -292,6 +304,7 @@ namespace Library.Api.Controllers
                 });
             }
 
+            // Yeni email başka aktif kullanıcıda varsa talep oluşturulmaz.
             var existingUser = await _userManager.Users
                 .FirstOrDefaultAsync(x =>
                     x.NormalizedEmail == normalizedNewEmail &&
@@ -311,6 +324,7 @@ namespace Library.Api.Controllers
 
             var lowerNewEmail = newEmail.ToLower();
 
+            // Member tablosunda da aynı email'in başka üyede kullanılıp kullanılmadığı kontrol edilir.
             var existingMember = await _context.Members
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x =>
@@ -329,6 +343,7 @@ namespace Library.Api.Controllers
                 });
             }
 
+            // Aynı kullanıcının aynı anda birden fazla bekleyen email değişikliği talebi oluşturması engellenir.
             var pendingForCurrentUserExists = await _context.EmailChangeRequests
                 .AnyAsync(x =>
                     x.UserId == user.Id &&
@@ -346,6 +361,7 @@ namespace Library.Api.Controllers
                 });
             }
 
+            // Aynı yeni email için başka bekleyen talep varsa çakışma oluşmaması için engellenir.
             var pendingSameEmailExists = await _context.EmailChangeRequests
                 .AnyAsync(x =>
                     x.NewEmail.ToLower() == lowerNewEmail &&
@@ -384,6 +400,8 @@ namespace Library.Api.Controllers
             });
         }
 
+        // Kullanıcının kendi aktif loan kaydının süresini uzatmasını sağlar.
+        // İşlem yalnızca token sahibi kullanıcıya ait loan üzerinde yapılabilir.
         [HttpPost("loans/{id:int}/renew")]
         public async Task<IActionResult> RenewMyLoan(int id)
         {
@@ -453,6 +471,8 @@ namespace Library.Api.Controllers
                 });
             }
 
+            // Kitap için aktif rezervasyon varsa mevcut kullanıcının süre uzatması engellenir.
+            // Böylece başka kullanıcıların rezervasyon hakkı korunur.
             var hasActiveReservation = await _context.Reservations.AnyAsync(x =>
                 x.BookId == loan.Copy.BookId &&
                 x.Status == ReservationStatus.Active);
@@ -477,6 +497,8 @@ namespace Library.Api.Controllers
             return Ok(MapLoan(loan));
         }
 
+        // Kullanıcının kendi aktif loan kaydı için iade talebi oluşturmasını sağlar.
+        // Talep oluşunca görevli onayı beklenir.
         [HttpPost("loans/{id:int}/request-return")]
         public async Task<IActionResult> RequestReturn(int id, [FromBody] RequestReturnDto dto)
         {
@@ -531,6 +553,8 @@ namespace Library.Api.Controllers
             return Ok(MapLoan(loan));
         }
 
+        // JWT token içindeki user id üzerinden mevcut kullanıcıya bağlı Member kaydını bulur.
+        // Bu metot sayesinde kullanıcı sadece kendi kayıtları üzerinde işlem yapabilir.
         private async Task<Member?> GetCurrentMemberAsync()
         {
             var userId =
@@ -545,6 +569,8 @@ namespace Library.Api.Controllers
                 .FirstOrDefaultAsync(x => x.UserId == userId);
         }
 
+        // Loan entity'sini frontend'e dönecek DTO formatına çevirir.
+        // Aktif loan gecikmişse response tarafında Overdue olarak gösterilir.
         private static LoanItemDto MapLoan(Loan loan)
         {
             var status = loan.Status;

@@ -11,6 +11,9 @@ namespace Library.Api.Controllers
 {
     [ApiController]
     [Route("api/registration-requests")]
+
+    // Üyelik başvurularını yönetme işlemi yalnızca Admin ve Librarian rollerine açıktır.
+    // Ziyaretçi başvuruyu AuthController üzerinden oluşturur; bu controller başvuruları inceler.
     [Authorize(Roles = "Admin,Librarian")]
     public class RegistrationRequestsController : ControllerBase
     {
@@ -28,10 +31,14 @@ namespace Library.Api.Controllers
             _roleManager = roleManager;
         }
 
+        // Tüm üyelik başvurularını listeler.
+        // İsteğe bağlı status parametresiyle Pending, Approved veya Rejected durumlarına göre filtreleme yapılabilir.
         [HttpGet]
         public async Task<IActionResult> GetAll([FromQuery] string? status = null)
         {
-            var query = _context.RegistrationRequests.AsNoTracking().AsQueryable();
+            var query = _context.RegistrationRequests
+                .AsNoTracking()
+                .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(status) &&
                 Enum.TryParse<RegistrationRequestStatus>(status, true, out var parsedStatus))
@@ -60,6 +67,8 @@ namespace Library.Api.Controllers
             return Ok(new { items });
         }
 
+        // Sadece onay bekleyen üyelik başvurularını listeler.
+        // Görevli panelindeki bekleyen başvurular ekranı için kullanılır.
         [HttpGet("pending")]
         public async Task<IActionResult> GetPending()
         {
@@ -86,6 +95,7 @@ namespace Library.Api.Controllers
             return Ok(new { items });
         }
 
+        // Belirli bir üyelik başvurusunun detayını döndürür.
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(int id)
         {
@@ -123,6 +133,8 @@ namespace Library.Api.Controllers
             return Ok(item);
         }
 
+        // Bekleyen bir üyelik başvurusunu onaylar.
+        // Onaylandığında ApplicationUser hesabı oluşturulur, User rolü atanır ve bağlı Member kaydı açılır.
         [HttpPost("{id:int}/approve")]
         public async Task<IActionResult> Approve(int id)
         {
@@ -153,7 +165,10 @@ namespace Library.Api.Controllers
                 });
             }
 
+            // Başvuru oluşturulduktan sonra aynı username veya email başka şekilde alınmış olabilir.
+            // Bu yüzden onay anında da tekrar kontrol yapılır.
             var existingUserByName = await _userManager.FindByNameAsync(request.Username);
+
             if (existingUserByName != null)
             {
                 return BadRequest(new
@@ -167,6 +182,7 @@ namespace Library.Api.Controllers
             }
 
             var existingUserByEmail = await _userManager.FindByEmailAsync(request.Email);
+
             if (existingUserByEmail != null)
             {
                 return BadRequest(new
@@ -179,6 +195,7 @@ namespace Library.Api.Controllers
                 });
             }
 
+            // Onaylanan her başvuru normal kullanıcı hesabına dönüştürüleceği için User rolü sistemde bulunmalıdır.
             if (!await _roleManager.RoleExistsAsync("User"))
             {
                 return BadRequest(new
@@ -191,6 +208,8 @@ namespace Library.Api.Controllers
                 });
             }
 
+            // Kullanıcı oluşturma, rol atama, member oluşturma ve request durum güncelleme işlemleri
+            // tek transaction içinde yapılır. Böylece işlem yarım kalırsa veri tutarlılığı bozulmaz.
             await using var transaction = await _context.Database.BeginTransactionAsync();
 
             var user = new ApplicationUser
@@ -201,6 +220,8 @@ namespace Library.Api.Controllers
                 SecurityStamp = Guid.NewGuid().ToString()
             };
 
+            // Şifre başvuru oluşturulurken hashlenmiştir.
+            // Onay aşamasında düz metin şifre kullanılmaz; hash doğrudan Identity kullanıcısına aktarılır.
             user.PasswordHash = request.PasswordHash;
 
             var createUserResult = await _userManager.CreateAsync(user);
@@ -243,6 +264,8 @@ namespace Library.Api.Controllers
                 });
             }
 
+            // Kütüphane işlemleri Member kaydı üzerinden yürür.
+            // UserId bağlantısı sayesinde kullanıcı MeController üzerinden sadece kendi member kaydına erişebilir.
             var member = new Member
             {
                 FullName = request.FullName,
@@ -271,6 +294,8 @@ namespace Library.Api.Controllers
             });
         }
 
+        // Bekleyen bir üyelik başvurusunu reddeder.
+        // Reddedilen başvurudan ApplicationUser veya Member kaydı oluşturulmaz.
         [HttpPost("{id:int}/reject")]
         public async Task<IActionResult> Reject(int id, [FromBody] RejectRegistrationRequestDto dto)
         {

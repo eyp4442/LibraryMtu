@@ -7,35 +7,41 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using System.IdentityModel.Tokens.Jwt;
 using Microsoft.OpenApi.Models;
-using Microsoft.IdentityModel.JsonWebTokens;
 using JwtClaimNames = Microsoft.IdentityModel.JsonWebTokens.JwtRegisteredClaimNames;
 using System.Security.Claims;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Controller tabanlı Web API yapısını aktif eder.
 builder.Services.AddControllers();
 
+// Veritabanı bağlantı bilgisi appsettings dosyasından okunur.
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
                       ?? throw new InvalidOperationException("DefaultConnection not found.");
 
+// EF Core DbContext MySQL ile çalışacak şekilde kaydedilir.
 builder.Services.AddDbContext<LibraryDbContext>(options =>
     options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
 
+// ASP.NET Identity kullanıcı ve rol sistemi yapılandırılır.
 builder.Services
     .AddIdentity<ApplicationUser, IdentityRole>(options =>
     {
+        // Demo/proje ortamı için şifre kuralları sade tutulmuştur.
         options.Password.RequireDigit = false;
         options.Password.RequireUppercase = false;
         options.Password.RequireLowercase = false;
         options.Password.RequireNonAlphanumeric = false;
         options.Password.RequiredLength = 6;
+
+        // Aynı email ile birden fazla Identity kullanıcısı oluşturulmasını engeller.
         options.User.RequireUniqueEmail = true;
     })
     .AddEntityFrameworkStores<LibraryDbContext>()
     .AddDefaultTokenProviders();
 
+// JWT doğrulaması için gerekli konfigürasyon değerleri okunur.
 var jwtKey = builder.Configuration["Jwt:Key"]
              ?? throw new InvalidOperationException("Jwt:Key not found.");
 
@@ -47,7 +53,7 @@ var jwtAudience = builder.Configuration["Jwt:Audience"]
 
 var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
 
-
+// API'nin varsayılan authentication yöntemi JWT Bearer olarak ayarlanır.
 builder.Services
     .AddAuthentication(options =>
     {
@@ -56,6 +62,8 @@ builder.Services
     })
     .AddJwtBearer(options =>
     {
+        // Claim isimlerinin ASP.NET tarafından otomatik dönüştürülmesini engeller.
+        // Böylece token içindeki claim isimleri daha kontrollü kullanılır.
         options.MapInboundClaims = false;
 
         options.TokenValidationParameters = new TokenValidationParameters
@@ -64,14 +72,21 @@ builder.Services
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
+
             ValidIssuer = jwtIssuer,
             ValidAudience = jwtAudience,
             IssuerSigningKey = signingKey,
+
+            // Token süresi dolduğunda ek tolerans tanınmaz.
             ClockSkew = TimeSpan.Zero,
+
+            // Kullanıcı adı ve rol claim tipleri token üretimiyle uyumlu tutulur.
             NameClaimType = JwtClaimNames.UniqueName,
             RoleClaimType = ClaimTypes.Role
         };
 
+        // Geliştirme sırasında JWT doğrulama hatalarını görmek için kullanılır.
+        // Production ortamında daha kontrollü logging tercih edilmelidir.
         options.Events = new JwtBearerEvents
         {
             OnAuthenticationFailed = context =>
@@ -83,13 +98,15 @@ builder.Services
                 return Task.CompletedTask;
             }
         };
-                    
-    }); 
+    });
 
+// Authorize attribute'larının çalışması için authorization servisi eklenir.
 builder.Services.AddAuthorization();
 
+// Token üretimi ve refresh token işlemleri için servis kaydı.
 builder.Services.AddScoped<ITokenService, TokenService>();
 
+// Swagger/OpenAPI dokümantasyonu aktif edilir.
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
@@ -99,6 +116,7 @@ builder.Services.AddSwaggerGen(options =>
         Version = "v1"
     });
 
+    // Swagger üzerinden JWT Bearer token ile test yapılmasını sağlar.
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -125,6 +143,7 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
+// Frontend geliştirme sunucularının API'ye istek atabilmesi için CORS politikası tanımlanır.
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("FrontendDev", policy =>
@@ -138,22 +157,27 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Uygulama başlangıcında migrationlar uygulanır ve temel roller/kullanıcılar oluşturulur.
 using (var scope = app.Services.CreateScope())
 {
     await DbSeeder.SeedAsync(scope.ServiceProvider);
 }
 
+// Swagger yalnızca development ortamında açılır.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
+// Frontend'den gelen isteklere CORS politikası uygulanır.
 app.UseCors("FrontendDev");
 
+// Önce kullanıcının kimliği doğrulanır, sonra endpoint yetkisi kontrol edilir.
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Controller endpointleri request pipeline'a eklenir.
 app.MapControllers();
 
 app.Run();
