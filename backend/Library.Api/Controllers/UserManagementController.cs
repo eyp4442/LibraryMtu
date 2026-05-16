@@ -8,9 +8,14 @@ namespace Library.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+
+    // Kullanıcı yönetimi yalnızca Admin rolüne açıktır.
+    // Librarian ve User rolleri bu controller üzerinden sistem kullanıcılarını yönetemez.
     [Authorize(Roles = "Admin")]
     public class UserManagementController : ControllerBase
     {
+        // Sistemde izin verilen roller merkezi olarak sınırlandırılır.
+        // Böylece geçersiz veya beklenmeyen rollerin atanması engellenir.
         private static readonly string[] AllowedRoles = { "Admin", "Librarian", "User" };
 
         private readonly UserManager<ApplicationUser> _userManager;
@@ -24,6 +29,8 @@ namespace Library.Api.Controllers
             _roleManager = roleManager;
         }
 
+        // Sistemdeki tüm kullanıcı hesaplarını ve ilk rollerini listeler.
+        // Admin panelindeki kullanıcı yönetimi ekranı için kullanılır.
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -45,17 +52,22 @@ namespace Library.Api.Controllers
             return Ok(new { items });
         }
 
+        // Admin tarafından yeni sistem kullanıcısı oluşturur.
+        // Bu endpoint özellikle Admin veya Librarian gibi yönetim hesapları için uygundur.
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateUserDto dto)
         {
             var validationError = ValidateCreateUserDto(dto);
+
             if (validationError != null)
                 return validationError;
 
             var username = dto.Username.Trim();
             var role = dto.Role.Trim();
 
+            // Username login için benzersiz olmalıdır.
             var existingUser = await _userManager.FindByNameAsync(username);
+
             if (existingUser != null)
             {
                 return BadRequest(new
@@ -68,6 +80,7 @@ namespace Library.Api.Controllers
                 });
             }
 
+            // İstenen rolün Identity tarafında gerçekten tanımlı olduğu doğrulanır.
             if (!await _roleManager.RoleExistsAsync(role))
             {
                 return BadRequest(new
@@ -83,10 +96,14 @@ namespace Library.Api.Controllers
             var user = new ApplicationUser
             {
                 UserName = username,
+
+                // Bu endpoint email almadığı için username tabanlı local email üretilir.
+                // Gerçek kullanıcı üyeliği için RegistrationRequest akışı daha uygundur.
                 Email = $"{username}@library.local",
                 EmailConfirmed = true
             };
 
+            // Şifre hashleme işlemi ASP.NET Identity tarafından yapılır.
             var createResult = await _userManager.CreateAsync(user, dto.Password);
 
             if (!createResult.Succeeded)
@@ -135,6 +152,8 @@ namespace Library.Api.Controllers
             return CreatedAtAction(nameof(GetAll), new { id = user.Id }, response);
         }
 
+        // Mevcut kullanıcının rolünü değiştirir.
+        // Sistem tek rol mantığıyla çalıştığı için önce mevcut roller kaldırılır, sonra yeni rol atanır.
         [HttpPut("{id}/role")]
         public async Task<IActionResult> UpdateRole(string id, [FromBody] UpdateUserRoleDto dto)
         {
@@ -156,6 +175,7 @@ namespace Library.Api.Controllers
 
             var newRole = dto.Role.Trim();
 
+            // Role değeri yalnızca sistemin izin verdiği rollerden biri olabilir.
             if (!AllowedRoles.Contains(newRole))
             {
                 return BadRequest(new
@@ -182,6 +202,7 @@ namespace Library.Api.Controllers
                 });
             }
 
+            // Rolün Identity tarafında tanımlı olması gerekir.
             if (!await _roleManager.RoleExistsAsync(newRole))
             {
                 return BadRequest(new
@@ -247,6 +268,8 @@ namespace Library.Api.Controllers
             return Ok(response);
         }
 
+        // Kullanıcı oluşturma için ortak validation metodudur.
+        // Hata varsa standart error envelope formatında BadRequest döndürür.
         private IActionResult? ValidateCreateUserDto(CreateUserDto dto)
         {
             var details = new List<object>();

@@ -7,6 +7,7 @@ namespace Library.Api.Models
         public int MemberId { get; set; }
         public Member Member { get; set; } = null!;
 
+        // Rezervasyon belirli bir fiziksel kopyaya değil, kitap kaydına yapılır.
         public int BookId { get; set; }
         public Book Book { get; set; } = null!;
 

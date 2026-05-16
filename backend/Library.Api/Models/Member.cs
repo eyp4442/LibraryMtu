@@ -8,6 +8,8 @@ namespace Library.Api.Models
         public string Phone { get; set; } = string.Empty;
         public string Address { get; set; } = string.Empty;
 
+        // Login hesabı ile member profilini bağlar.
+        // Manuel oluşturulan üyelerde null olabilir; kullanıcı paneli için dolu olması beklenir.
         public string? UserId { get; set; }
         public ApplicationUser? User { get; set; }
 

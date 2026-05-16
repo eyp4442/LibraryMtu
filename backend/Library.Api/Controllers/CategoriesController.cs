@@ -9,6 +9,9 @@ namespace Library.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+
+    // Kategori yönetimi operasyonel bir görevdir.
+    // Listeleme ve detay görüntüleme public; oluşturma, güncelleme ve silme işlemleri yetkilidir.
     [Authorize(Roles = "Admin,Librarian")]
     public class CategoriesController : ControllerBase
     {
@@ -19,6 +22,8 @@ namespace Library.Api.Controllers
             _context = context;
         }
 
+        // Tüm kategorileri alfabetik olarak listeler.
+        // Kitap listeleme ekranındaki kategori filtreleri için public olarak kullanılabilir.
         [AllowAnonymous]
         [HttpGet]
         public async Task<IActionResult> GetAll()
@@ -35,6 +40,7 @@ namespace Library.Api.Controllers
             return Ok(new { items });
         }
 
+        // Belirli bir kategorinin detayını döndürür.
         [AllowAnonymous]
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(int id)
@@ -63,6 +69,8 @@ namespace Library.Api.Controllers
             return Ok(category);
         }
 
+        // Yeni kategori oluşturur.
+        // Aynı isimde ikinci bir kategori oluşturulması engellenir.
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateCategoryDto dto)
         {
@@ -84,6 +92,8 @@ namespace Library.Api.Controllers
 
             var normalizedName = dto.Name.Trim();
 
+            // Kategori adı benzersiz tutulur.
+            // Aynı kategori adının tekrar eklenmesi kitap filtreleme ve yönetim tarafında karışıklık oluşturabilir.
             var exists = await _context.Categories
                 .AnyAsync(x => x.Name == normalizedName);
 
@@ -116,6 +126,8 @@ namespace Library.Api.Controllers
             return CreatedAtAction(nameof(GetById), new { id = category.Id }, response);
         }
 
+        // Mevcut kategori adını günceller.
+        // Güncelleme sırasında aynı adın başka bir kategoride kullanılıp kullanılmadığı kontrol edilir.
         [HttpPut("{id:int}")]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateCategoryDto dto)
         {
@@ -151,6 +163,7 @@ namespace Library.Api.Controllers
 
             var normalizedName = dto.Name.Trim();
 
+            // Mevcut kategori hariç aynı ada sahip başka kategori varsa güncelleme engellenir.
             var exists = await _context.Categories
                 .AnyAsync(x => x.Id != id && x.Name == normalizedName);
 
@@ -178,9 +191,12 @@ namespace Library.Api.Controllers
             return Ok(response);
         }
 
+        // Kategori siler.
+        // Kategoriye bağlı kitap varsa silme işlemi engellenir.
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int id)
         {
+            // Books ilişkisi silme kararında gerekli olduğu için dahil edilir.
             var category = await _context.Categories
                 .Include(x => x.Books)
                 .FirstOrDefaultAsync(x => x.Id == id);
@@ -197,6 +213,8 @@ namespace Library.Api.Controllers
                 });
             }
 
+            // Bağlı kitaplar varken kategori silinirse kitapların kategori ilişkisi bozulabilir.
+            // Bu yüzden önce kitaplar başka kategoriye taşınmalı veya ilgili kayıtlar yönetilmelidir.
             if (category.Books.Any())
             {
                 return BadRequest(new

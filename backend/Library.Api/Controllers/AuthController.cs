@@ -33,6 +33,8 @@ namespace Library.Api.Controllers
             _passwordHasher = passwordHasher;
         }
 
+        // Public üyelik başvurusu oluşturur.
+        // Bu aşamada gerçek kullanıcı hesabı açılmaz; başvuru onay bekleyen kayıt olarak tutulur.
         [AllowAnonymous]
         [HttpPost("register-request")]
         public async Task<IActionResult> RegisterRequest([FromBody] CreateRegistrationRequestDto dto)
@@ -76,6 +78,7 @@ namespace Library.Api.Controllers
             var normalizedEmail = dto.Email.Trim().ToLower();
             var normalizedUsername = dto.Username.Trim();
 
+            // Aynı username veya email ile aktif kullanıcı varsa başvuru kabul edilmez.
             var existingUserByName = await _userManager.FindByNameAsync(normalizedUsername);
             if (existingUserByName != null)
             {
@@ -102,6 +105,7 @@ namespace Library.Api.Controllers
                 });
             }
 
+            // Aynı username veya email için zaten bekleyen başvuru varsa ikinci başvuru engellenir.
             var pendingUsernameExists = await _context.RegistrationRequests
                 .AnyAsync(x => x.Username == normalizedUsername && x.Status == RegistrationRequestStatus.Pending);
 
@@ -132,6 +136,7 @@ namespace Library.Api.Controllers
                 });
             }
 
+            // Şifre düz metin olarak saklanmaz; onay sonrası kullanıcı oluşturmak için hashlenmiş hali tutulur.
             var passwordHash = _passwordHasher.HashPassword(
                 new ApplicationUser { UserName = normalizedUsername, Email = dto.Email.Trim() },
                 dto.Password.Trim());
@@ -159,6 +164,7 @@ namespace Library.Api.Controllers
             });
         }
 
+        // Kullanıcı adı ve şifreyi doğrular; başarılıysa access token ve refresh token üretir.
         [AllowAnonymous]
         [HttpPost("login")]
         public async Task<IActionResult> Login([FromBody] LoginRequestDto dto)
@@ -209,6 +215,7 @@ namespace Library.Api.Controllers
             var rawRefreshToken = _tokenService.CreateRefreshToken();
             var refreshTokenExpiry = _tokenService.GetRefreshTokenExpiryUtc();
 
+            // Refresh token veritabanında açık şekilde değil, hashlenmiş haliyle saklanır.
             var refreshToken = new RefreshToken
             {
                 UserId = user.Id,
@@ -232,6 +239,8 @@ namespace Library.Api.Controllers
             return Ok(response);
         }
 
+        // Geçerli refresh token ile yeni access token ve refresh token üretir.
+        // Kullanılan eski refresh token revoke edilerek token rotation uygulanır.
         [AllowAnonymous]
         [HttpPost("refresh")]
         public async Task<IActionResult> Refresh([FromBody] RefreshTokenRequestDto dto)
@@ -313,6 +322,8 @@ namespace Library.Api.Controllers
             return Ok(response);
         }
 
+        // Gerçek logout akışıdır.
+        // Access token revoke listesine alınır, refresh token ise iptal edilir.
         [Authorize]
         [HttpPost("logout")]
         public async Task<IActionResult> Logout([FromBody] LogoutRequestDto dto)
@@ -372,11 +383,13 @@ namespace Library.Api.Controllers
             });
         }
 
+        // Token üzerinden giriş yapan kullanıcının temel kimlik ve rol bilgisini döndürür.
         [Authorize]
         [HttpGet("me")]
         public IActionResult Me()
         {
             var username = User.Identity?.Name;
+
             var roles = User.Claims
                 .Where(x => x.Type == ClaimTypes.Role)
                 .Select(x => x.Value)

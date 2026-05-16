@@ -9,6 +9,9 @@ namespace Library.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+
+    // Üye yönetimi operasyonel bir görevdir.
+    // Bu controller sadece Admin ve Librarian rollerine açıktır.
     [Authorize(Roles = "Admin,Librarian")]
     public class MembersController : ControllerBase
     {
@@ -19,6 +22,8 @@ namespace Library.Api.Controllers
             _context = context;
         }
 
+        // Tüm üyeleri ada göre sıralı şekilde listeler.
+        // Bu endpoint görevli/admin üye yönetimi ekranı için kullanılır.
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
@@ -38,6 +43,7 @@ namespace Library.Api.Controllers
             return Ok(new { items });
         }
 
+        // Belirli bir üyenin detay bilgisini döndürür.
         [HttpGet("{id:int}")]
         public async Task<IActionResult> GetById(int id)
         {
@@ -69,15 +75,20 @@ namespace Library.Api.Controllers
             return Ok(member);
         }
 
+        // Yeni üye oluşturur.
+        // Aynı email ile ikinci bir üye oluşturulması engellenir.
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateMemberDto dto)
         {
             var validationError = ValidateMemberDto(dto.FullName, dto.Email, dto.Phone, dto.Address);
+
             if (validationError != null)
                 return validationError;
 
             var normalizedEmail = dto.Email.Trim().ToLower();
 
+            // Email üye kayıtlarında benzersiz tutulur.
+            // Böylece aynı iletişim bilgisiyle birden fazla member kaydı oluşması engellenir.
             var exists = await _context.Members
                 .AnyAsync(x => x.Email.ToLower() == normalizedEmail);
 
@@ -116,14 +127,18 @@ namespace Library.Api.Controllers
             return CreatedAtAction(nameof(GetById), new { id = member.Id }, response);
         }
 
+        // Mevcut üye bilgilerini günceller.
+        // Güncelleme sırasında email'in başka bir üyede kullanılıp kullanılmadığı kontrol edilir.
         [HttpPut("{id:int}")]
         public async Task<IActionResult> Update(int id, [FromBody] UpdateMemberDto dto)
         {
             var validationError = ValidateMemberDto(dto.FullName, dto.Email, dto.Phone, dto.Address);
+
             if (validationError != null)
                 return validationError;
 
             var member = await _context.Members.FirstOrDefaultAsync(x => x.Id == id);
+
             if (member == null)
             {
                 return NotFound(new
@@ -138,6 +153,7 @@ namespace Library.Api.Controllers
 
             var normalizedEmail = dto.Email.Trim().ToLower();
 
+            // Mevcut üye hariç aynı email'e sahip başka bir member varsa güncelleme engellenir.
             var exists = await _context.Members
                 .AnyAsync(x => x.Id != id && x.Email.ToLower() == normalizedEmail);
 
@@ -172,9 +188,12 @@ namespace Library.Api.Controllers
             return Ok(response);
         }
 
+        // Üye kaydını siler.
+        // Üyeye bağlı loan veya reservation varsa silme işlemi engellenir.
         [HttpDelete("{id:int}")]
         public async Task<IActionResult> Delete(int id)
         {
+            // Loan ve reservation ilişkileri silme kararında gerekli olduğu için dahil edilir.
             var member = await _context.Members
                 .Include(x => x.Loans)
                 .Include(x => x.Reservations)
@@ -192,6 +211,8 @@ namespace Library.Api.Controllers
                 });
             }
 
+            // Loan geçmişi olan üye silinmez.
+            // Bu kural ödünç kayıtlarının geçmiş tutarlılığını korur.
             if (member.Loans.Any())
             {
                 return BadRequest(new
@@ -204,6 +225,8 @@ namespace Library.Api.Controllers
                 });
             }
 
+            // Reservation kaydı olan üye silinmez.
+            // Bu kural rezervasyon geçmişinin tutarlılığını korur.
             if (member.Reservations.Any())
             {
                 return BadRequest(new
@@ -222,6 +245,8 @@ namespace Library.Api.Controllers
             return NoContent();
         }
 
+        // Create ve Update işlemlerinde ortak kullanılan temel validation metodudur.
+        // Hata varsa standart error envelope formatında BadRequest döndürür.
         private IActionResult? ValidateMemberDto(string fullName, string email, string phone, string address)
         {
             var details = new List<object>();

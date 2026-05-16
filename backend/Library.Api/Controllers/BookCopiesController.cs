@@ -8,7 +8,14 @@ using Microsoft.EntityFrameworkCore;
 namespace Library.Api.Controllers
 {
     [ApiController]
+
+    // Bu controller'da route doğrudan "api" üzerinden başlatıldı.
+    // Böylece endpoint'ler /api/books/{bookId}/copies ve /api/copies/{copyId}
+    // gibi daha doğal bir REST yapısına sahip oldu.
     [Route("api")]
+
+    // Kitap kopyası yönetimi operasyonel bir görevdir.
+    // Bu yüzden sadece Admin ve Librarian rollerine açıktır.
     [Authorize(Roles = "Admin,Librarian")]
     public class BookCopiesController : ControllerBase
     {
@@ -19,10 +26,13 @@ namespace Library.Api.Controllers
             _context = context;
         }
 
+        // Belirli bir kitaba ait tüm fiziksel kopyaları listeler.
+        // Önce kitabın varlığı kontrol edilir; olmayan bir kitaba ait kopya listesi istenirse 404 döner.
         [HttpGet("books/{bookId:int}/copies")]
         public async Task<IActionResult> GetByBookId(int bookId)
         {
             var bookExists = await _context.Books.AnyAsync(x => x.Id == bookId);
+
             if (!bookExists)
             {
                 return NotFound(new
@@ -35,6 +45,8 @@ namespace Library.Api.Controllers
                 });
             }
 
+            // Listeleme işlemi sadece okuma amaçlı olduğu için AsNoTracking kullanılır.
+            // Bu, Entity Framework'ün gereksiz change tracking yapmasını engeller.
             var items = await _context.BookCopies
                 .AsNoTracking()
                 .Where(x => x.BookId == bookId)
@@ -51,6 +63,8 @@ namespace Library.Api.Controllers
             return Ok(new { items });
         }
 
+        // Belirli bir kitaba yeni fiziksel kopya ekler.
+        // BookId URL'den, barkod bilgisi ise request body'den alınır.
         [HttpPost("books/{bookId:int}/copies")]
         public async Task<IActionResult> Create(int bookId, [FromBody] CreateBookCopyDto dto)
         {
@@ -70,7 +84,10 @@ namespace Library.Api.Controllers
                 });
             }
 
+            // Kopya eklenmeden önce ilgili kitabın gerçekten var olup olmadığı kontrol edilir.
+            // Böylece var olmayan bir kitaba fiziksel kopya bağlanması engellenir.
             var bookExists = await _context.Books.AnyAsync(x => x.Id == bookId);
+
             if (!bookExists)
             {
                 return NotFound(new
@@ -85,6 +102,8 @@ namespace Library.Api.Controllers
 
             var normalizedBarcode = dto.Barcode.Trim();
 
+            // Barkod fiziksel kopyayı benzersiz şekilde temsil eder.
+            // Aynı barkodun birden fazla kopyada kullanılması veri tutarsızlığına yol açacağı için engellenir.
             var barcodeExists = await _context.BookCopies
                 .AnyAsync(x => x.Barcode == normalizedBarcode);
 
@@ -100,6 +119,8 @@ namespace Library.Api.Controllers
                 });
             }
 
+            // Yeni eklenen kopya başlangıçta kullanılabilir kabul edilir.
+            // Daha sonra checkout, return request veya maintenance gibi işlemlerle status değişebilir.
             var copy = new BookCopy
             {
                 BookId = bookId,
@@ -121,9 +142,12 @@ namespace Library.Api.Controllers
             return Created($"/api/books/{bookId}/copies", response);
         }
 
+        // Belirli bir fiziksel kitap kopyasını siler.
+        // Kopyanın geçmiş loan kaydı varsa silme işlemi engellenir.
         [HttpDelete("copies/{copyId:int}")]
         public async Task<IActionResult> Delete(int copyId)
         {
+            // Loan ilişkisi de çekilir çünkü silme kararında geçmiş ödünç kayıtları kontrol edilir.
             var copy = await _context.BookCopies
                 .Include(x => x.Loans)
                 .FirstOrDefaultAsync(x => x.Id == copyId);
@@ -140,6 +164,8 @@ namespace Library.Api.Controllers
                 });
             }
 
+            // Bir kopya daha önce ödünç verilmişse silinmez.
+            // Bu kural geçmiş loan kayıtlarının tutarlılığını korumak için uygulanır.
             if (copy.Loans.Any())
             {
                 return BadRequest(new

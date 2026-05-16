@@ -16,7 +16,9 @@ namespace Library.Api.Models
         public int CategoryId { get; set; }
         public Category Category { get; set; } = null!;
 
+        // Kitabın kütüphanedeki fiziksel nüshaları BookCopy üzerinden yönetilir.
         public ICollection<BookCopy> Copies { get; set; } = new List<BookCopy>();
+
         public ICollection<Reservation> Reservations { get; set; } = new List<Reservation>();
     }
 }

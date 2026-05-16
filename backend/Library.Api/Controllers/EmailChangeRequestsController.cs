@@ -11,6 +11,9 @@ namespace Library.Api.Controllers
 {
     [ApiController]
     [Route("api/email-change-requests")]
+
+    // E-posta değişikliği talepleri kullanıcı tarafından oluşturulur,
+    // fakat onaylama/reddetme işlemleri yalnızca Admin ve Librarian rollerine açıktır.
     [Authorize(Roles = "Admin,Librarian")]
     public class EmailChangeRequestsController : ControllerBase
     {
@@ -25,10 +28,14 @@ namespace Library.Api.Controllers
             _userManager = userManager;
         }
 
+        // Tüm e-posta değişiklik taleplerini listeler.
+        // İsteğe bağlı status parametresi ile Pending, Approved veya Rejected durumlarına göre filtreleme yapılabilir.
         [HttpGet]
         public async Task<IActionResult> GetAll([FromQuery] string? status = null)
         {
-            var query = _context.EmailChangeRequests.AsNoTracking().AsQueryable();
+            var query = _context.EmailChangeRequests
+                .AsNoTracking()
+                .AsQueryable();
 
             if (!string.IsNullOrWhiteSpace(status) &&
                 Enum.TryParse<EmailChangeRequestStatus>(status, true, out var parsedStatus))
@@ -56,6 +63,8 @@ namespace Library.Api.Controllers
             return Ok(new { items });
         }
 
+        // Sadece onay bekleyen e-posta değişiklik taleplerini listeler.
+        // Görevli panelinde bekleyen işler ekranı için kullanışlıdır.
         [HttpGet("pending")]
         public async Task<IActionResult> GetPending()
         {
@@ -81,6 +90,8 @@ namespace Library.Api.Controllers
             return Ok(new { items });
         }
 
+        // Bekleyen bir e-posta değişikliği talebini onaylar.
+        // Onay sırasında hem ApplicationUser.Email hem de Member.Email güncellenir.
         [HttpPost("{id:int}/approve")]
         public async Task<IActionResult> Approve(int id)
         {
@@ -113,6 +124,7 @@ namespace Library.Api.Controllers
             }
 
             var user = await _userManager.FindByIdAsync(request.UserId);
+
             if (user == null)
             {
                 return NotFound(new
@@ -127,6 +139,8 @@ namespace Library.Api.Controllers
 
             var normalizedNewEmail = _userManager.NormalizeEmail(request.NewEmail);
 
+            // Aynı e-posta başka aktif kullanıcıda varsa onay verilmez.
+            // Bu kural identity tarafında hesap karışıklığını engeller.
             var existingUser = await _userManager.Users
                 .FirstOrDefaultAsync(x => x.NormalizedEmail == normalizedNewEmail && x.Id != user.Id);
 
@@ -145,7 +159,10 @@ namespace Library.Api.Controllers
             user.Email = request.NewEmail;
             user.NormalizedEmail = normalizedNewEmail;
 
+            // Identity kullanıcısı UserManager üzerinden güncellenir.
+            // Böylece Identity'nin kendi validasyon ve güncelleme mekanizması korunur.
             var updateUserResult = await _userManager.UpdateAsync(user);
+
             if (!updateUserResult.Succeeded)
             {
                 return BadRequest(new
@@ -163,6 +180,7 @@ namespace Library.Api.Controllers
                 });
             }
 
+            // Kütüphane üyelik kaydı da Identity kullanıcısı ile senkron tutulur.
             request.Member.Email = request.NewEmail;
 
             request.Status = EmailChangeRequestStatus.Approved;
@@ -180,6 +198,8 @@ namespace Library.Api.Controllers
             });
         }
 
+        // Bekleyen bir e-posta değişikliği talebini reddeder.
+        // Reddetme sebebi opsiyonel olarak saklanır.
         [HttpPost("{id:int}/reject")]
         public async Task<IActionResult> Reject(int id, [FromBody] RejectEmailChangeRequestDto dto)
         {

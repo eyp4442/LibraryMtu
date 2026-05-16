@@ -6,12 +6,15 @@ namespace Library.Api.Data
 {
     public static class DbSeeder
     {
+        // Uygulama başlangıcında veritabanını hazırlar.
+        // Migrationları uygular, temel rolleri ve demo kullanıcılarını oluşturur.
         public static async Task SeedAsync(IServiceProvider serviceProvider)
         {
             var context = serviceProvider.GetRequiredService<LibraryDbContext>();
             var roleManager = serviceProvider.GetRequiredService<RoleManager<IdentityRole>>();
             var userManager = serviceProvider.GetRequiredService<UserManager<ApplicationUser>>();
 
+            // Bekleyen EF Core migrationları veritabanına uygular.
             await context.Database.MigrateAsync();
 
             var roles = new[] { "Admin", "Librarian", "User" };
@@ -45,6 +48,8 @@ namespace Library.Api.Data
                 password: "123456",
                 role: "User");
 
+            // User rolündeki demo hesabın MeController üzerinden çalışabilmesi için
+            // ApplicationUser hesabına bağlı bir Member kaydı oluşturulur.
             if (!await context.Members.AnyAsync(x => x.UserId == user.Id))
             {
                 context.Members.Add(new Member
@@ -60,6 +65,8 @@ namespace Library.Api.Data
             }
         }
 
+        // Verilen username'e sahip kullanıcı yoksa oluşturur.
+        // Kullanıcı varsa tekrar oluşturmaz; eksik rol varsa role ekler.
         private static async Task<ApplicationUser> EnsureUserAsync(
             UserManager<ApplicationUser> userManager,
             string username,
@@ -87,6 +94,7 @@ namespace Library.Api.Data
             }
 
             var roles = await userManager.GetRolesAsync(user);
+
             if (!roles.Contains(role))
             {
                 await userManager.AddToRoleAsync(user, role);

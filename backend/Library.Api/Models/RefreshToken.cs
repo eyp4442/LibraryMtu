@@ -4,13 +4,16 @@ namespace Library.Api.Models
     {
         public int Id { get; set; }
 
+        // Refresh token veritabanında açık haliyle değil, hashlenmiş haliyle tutulur.
         public string TokenHash { get; set; } = string.Empty;
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime ExpiresAt { get; set; }
         public DateTime? RevokedAt { get; set; }
 
+        // Refresh token rotation sırasında eski token'ın hangi yeni token ile değiştirildiğini izler.
         public string? ReplacedByTokenHash { get; set; }
+
         public string? ReasonRevoked { get; set; }
 
         public string UserId { get; set; } = string.Empty;

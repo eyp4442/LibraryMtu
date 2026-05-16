@@ -1,5 +1,7 @@
 namespace Library.Api.DTOs.Books
 {
+    // Kitabın fiziksel kopyalarına ait stok durumunu özetleyen response DTO'su.
+    // Bu bilgi BookCopy kayıtlarının durumlarına göre hesaplanır.
     public class StockSummaryDto
     {
         public int Total { get; set; }
@@ -9,6 +11,8 @@ namespace Library.Api.DTOs.Books
         public int PendingReturnApproval { get; set; }
     }
 
+    // Kitap listeleme ve temel kitap gösterimi için kullanılan response DTO'su.
+    // Kitap bilgileriyle birlikte kategori ve stok özetini de frontend'e taşır.
     public class BookListItemDto
     {
         public int Id { get; set; }
@@ -31,10 +35,14 @@ namespace Library.Api.DTOs.Books
         public StockSummaryDto StockSummary { get; set; } = new();
     }
 
+    // Şu an liste DTO'su ile aynı alanları taşır.
+    // Ayrı tutulması, ileride kitap detayına özel alanlar eklenebilmesini kolaylaştırır.
     public class BookDetailDto : BookListItemDto
     {
     }
 
+    // Yeni kitap oluştururken frontend'den gelen request modelidir.
+    // Fiziksel kopya bilgileri burada yer almaz; kopyalar BookCopies modülüyle ayrıca eklenir.
     public class CreateBookDto
     {
         public string Title { get; set; } = string.Empty;
@@ -49,6 +57,7 @@ namespace Library.Api.DTOs.Books
         public int CategoryId { get; set; }
     }
 
+    // Mevcut kitap bilgilerini güncellemek için kullanılan request modelidir.
     public class UpdateBookDto
     {
         public string Title { get; set; } = string.Empty;

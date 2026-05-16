@@ -17,6 +17,7 @@ namespace Library.Api.Services
             _configuration = configuration;
         }
 
+        // Kullanıcının kimlik ve rol bilgilerini taşıyan JWT access token oluşturur.
         public string CreateAccessToken(ApplicationUser user, IList<string> roles)
         {
             var key = _configuration["Jwt:Key"]
@@ -34,10 +35,16 @@ namespace Library.Api.Services
 
             var claims = new List<Claim>
             {
+                // Kullanıcı id bilgisi farklı standart claim adlarıyla eklenir.
+                // Böylece controller tarafında user id güvenilir şekilde okunabilir.
                 new Claim(JwtRegisteredClaimNames.Sub, user.Id),
                 new Claim(ClaimTypes.NameIdentifier, user.Id),
+
                 new Claim(ClaimTypes.Name, user.UserName ?? string.Empty),
                 new Claim(JwtRegisteredClaimNames.UniqueName, user.UserName ?? string.Empty),
+
+                // Token'ın benzersiz kimliğidir.
+                // Logout sonrası access token revoke listesine bu değerle eklenir.
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
             };
 
@@ -46,6 +53,7 @@ namespace Library.Api.Services
                 claims.Add(new Claim(ClaimTypes.Email, user.Email));
             }
 
+            // Role claim'leri Authorize(Roles = "...") kontrollerinin çalışmasını sağlar.
             foreach (var role in roles)
             {
                 claims.Add(new Claim(ClaimTypes.Role, role));
@@ -65,18 +73,22 @@ namespace Library.Api.Services
             return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
+        // Kriptografik olarak güvenli rastgele refresh token üretir.
         public string CreateRefreshToken()
         {
             var bytes = RandomNumberGenerator.GetBytes(64);
             return Base64UrlEncoder.Encode(bytes);
         }
 
+        // Refresh token veritabanında açık haliyle saklanmaz.
+        // Karşılaştırma yapılabilmesi için SHA256 hash değeri tutulur.
         public string HashToken(string token)
         {
             var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
             return Convert.ToHexString(bytes);
         }
 
+        // Refresh token geçerlilik süresini config değerine göre hesaplar.
         public DateTime GetRefreshTokenExpiryUtc()
         {
             var days = int.TryParse(_configuration["Jwt:RefreshTokenExpiresInDays"], out var parsedDays)
@@ -86,6 +98,7 @@ namespace Library.Api.Services
             return DateTime.UtcNow.AddDays(days);
         }
 
+        // Frontend'in access token süresini takip edebilmesi için süreyi saniye cinsinden döndürür.
         public int GetAccessTokenExpiresInSeconds()
         {
             var minutes = int.TryParse(_configuration["Jwt:ExpiresInMinutes"], out var parsedMinutes)
