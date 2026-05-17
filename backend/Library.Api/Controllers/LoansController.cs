@@ -27,6 +27,8 @@ namespace Library.Api.Controllers
         [HttpPost("checkout")]
         public async Task<IActionResult> Checkout([FromBody] CheckoutLoanDto dto)
         {
+            await ExpireOldReservationsAsync();
+
             if (dto.MemberId <= 0 || dto.CopyId <= 0)
             {
                 return BadRequest(new
@@ -40,6 +42,18 @@ namespace Library.Api.Controllers
                             dto.MemberId <= 0 ? new { field = "memberId", message = "Must be greater than 0" } : null,
                             dto.CopyId <= 0 ? new { field = "copyId", message = "Must be greater than 0" } : null
                         }.Where(x => x != null)
+                    }
+                });
+            }
+
+            if (dto.DueDate <= DateTime.UtcNow)
+            {
+                return BadRequest(new
+                {
+                    error = new
+                    {
+                        code = "INVALID_DUE_DATE",
+                        message = "Due date must be in the future"
                     }
                 });
             }
@@ -72,8 +86,46 @@ namespace Library.Api.Controllers
                 });
             }
 
-            // Aynı fiziksel kopya aynı anda yalnızca bir aktif loan içinde olabilir.
-            if (copy.Status != BookCopyStatus.Available)
+            Reservation? matchingReservation = null;
+
+            if (copy.Status == BookCopyStatus.Reserved)
+            {
+                matchingReservation = await _context.Reservations
+                    .FirstOrDefaultAsync(x =>
+                        x.MemberId == dto.MemberId &&
+                        x.CopyId == dto.CopyId &&
+                        x.Status == ReservationStatus.Active);
+
+                if (matchingReservation == null)
+                {
+                    return BadRequest(new
+                    {
+                        error = new
+                        {
+                            code = "COPY_RESERVED_FOR_ANOTHER_MEMBER",
+                            message = "This copy is reserved for another member"
+                        }
+                    });
+                }
+
+                if (matchingReservation.ExpiresAt.HasValue &&
+                    matchingReservation.ExpiresAt.Value < DateTime.UtcNow)
+                {
+                    matchingReservation.Status = ReservationStatus.Expired;
+                    copy.Status = BookCopyStatus.Available;
+                    await _context.SaveChangesAsync();
+
+                    return BadRequest(new
+                    {
+                        error = new
+                        {
+                            code = "RESERVATION_EXPIRED",
+                            message = "Reservation has expired"
+                        }
+                    });
+                }
+            }
+            else if (copy.Status != BookCopyStatus.Available)
             {
                 return BadRequest(new
                 {
@@ -97,6 +149,11 @@ namespace Library.Api.Controllers
             };
 
             copy.Status = BookCopyStatus.Loaned;
+
+            if (matchingReservation != null)
+            {
+                matchingReservation.Status = ReservationStatus.Fulfilled;
+            }
 
             _context.Loans.Add(loan);
             await _context.SaveChangesAsync();
@@ -346,6 +403,34 @@ namespace Library.Api.Controllers
                 .ToListAsync();
 
             return Ok(new { items });
+        }
+
+        private async Task ExpireOldReservationsAsync()
+        {
+            var now = DateTime.UtcNow;
+
+            var expiredReservations = await _context.Reservations
+                .Include(x => x.Copy)
+                .Where(x =>
+                    x.Status == ReservationStatus.Active &&
+                    x.ExpiresAt != null &&
+                    x.ExpiresAt < now)
+                .ToListAsync();
+
+            if (expiredReservations.Count == 0)
+                return;
+
+            foreach (var reservation in expiredReservations)
+            {
+                reservation.Status = ReservationStatus.Expired;
+
+                if (reservation.Copy != null && reservation.Copy.Status == BookCopyStatus.Reserved)
+                {
+                    reservation.Copy.Status = BookCopyStatus.Available;
+                }
+            }
+
+            await _context.SaveChangesAsync();
         }
 
         // Loan entity'sini frontend'e dönecek DTO formatına çevirir.

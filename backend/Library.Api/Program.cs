@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text;
 using Library.Api.Data;
 using Library.Api.Interfaces;
@@ -9,7 +10,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using JwtClaimNames = Microsoft.IdentityModel.JsonWebTokens.JwtRegisteredClaimNames;
-using System.Security.Claims;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -173,8 +173,48 @@ if (app.Environment.IsDevelopment())
 // Frontend'den gelen isteklere CORS politikası uygulanır.
 app.UseCors("FrontendDev");
 
-// Önce kullanıcının kimliği doğrulanır, sonra endpoint yetkisi kontrol edilir.
+// Önce kullanıcının kimliği doğrulanır.
 app.UseAuthentication();
+
+// Logout edilen access tokenların tekrar kullanılmasını engeller.
+// AuthController logout sırasında access token'ın jti değerini RevokedAccessTokens tablosuna kaydediyorsa,
+// burada her authenticated istekte o jti kontrol edilir.
+app.Use(async (context, next) =>
+{
+    if (context.User.Identity?.IsAuthenticated == true)
+    {
+        // TokenService içinde eklenen JWT ID claim'i token içinde "jti" adıyla bulunur.
+        var jti = context.User.FindFirst("jti")?.Value;
+
+        if (!string.IsNullOrWhiteSpace(jti))
+        {
+            var dbContext = context.RequestServices.GetRequiredService<LibraryDbContext>();
+
+            var isRevoked = await dbContext.RevokedAccessTokens
+                .AnyAsync(x => x.Jti == jti && x.ExpiresAt > DateTime.UtcNow);
+
+            if (isRevoked)
+            {
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    error = new
+                    {
+                        code = "ACCESS_TOKEN_REVOKED",
+                        message = "Access token has been revoked"
+                    }
+                });
+
+                return;
+            }
+        }
+    }
+
+    await next();
+});
+
+// Kimlik doğrulandıktan ve revoked token kontrolünden geçtikten sonra rol/yetki kontrolü yapılır.
 app.UseAuthorization();
 
 // Controller endpointleri request pipeline'a eklenir.
