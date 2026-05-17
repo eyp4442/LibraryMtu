@@ -1,22 +1,22 @@
-// src/pages/ApproveMembers.jsx
+// src/pages/PendingReturns.jsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
 
-const ApproveMembers = () => {
+const PendingReturns = () => {
   const navigate = useNavigate();
 
-  const [pendingUsers, setPendingUsers] = useState([]);
+  const [loans, setLoans] = useState([]);
   const [loading, setLoading] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
   useEffect(() => {
-    loadPendingUsers();
+    loadPendingReturns();
   }, []);
 
-  const loadPendingUsers = async () => {
+  const loadPendingReturns = async () => {
     const token = localStorage.getItem("accessToken");
     const role = localStorage.getItem("role");
 
@@ -35,12 +35,12 @@ const ApproveMembers = () => {
       setErrorMessage("");
       setSuccessMessage("");
 
-      const response = await api.get("/api/registration-requests/pending");
-      setPendingUsers(response.data.items || []);
+      const response = await api.get("/api/Loans/pending-return");
+      setLoans(response.data.items || []);
     } catch (error) {
       const message =
         error.response?.data?.error?.message ||
-        "Üyelik başvuruları yüklenirken bir hata oluştu.";
+        "İade onayı bekleyen kayıtlar yüklenirken bir hata oluştu.";
 
       setErrorMessage(message);
 
@@ -52,26 +52,26 @@ const ApproveMembers = () => {
     }
   };
 
-  const handleApprove = async (id) => {
+  const handleApproveReturn = async (loanId) => {
     const confirmed = window.confirm(
-      "Bu üyelik başvurusunu onaylamak istiyor musunuz?"
+      "Bu iade talebini onaylamak istiyor musunuz?"
     );
 
     if (!confirmed) return;
 
     try {
-      setActionLoadingId(id);
+      setActionLoadingId(loanId);
       setErrorMessage("");
       setSuccessMessage("");
 
-      await api.post(`/api/registration-requests/${id}/approve`);
+      await api.post(`/api/Loans/${loanId}/approve-return`);
 
-      setSuccessMessage("Üyelik başvurusu başarıyla onaylandı.");
-      setPendingUsers((previous) => previous.filter((user) => user.id !== id));
+      setSuccessMessage("İade talebi başarıyla onaylandı.");
+      setLoans((previous) => previous.filter((loan) => loan.id !== loanId));
     } catch (error) {
       const message =
         error.response?.data?.error?.message ||
-        "Üyelik başvurusu onaylanırken bir hata oluştu.";
+        "İade talebi onaylanırken bir hata oluştu.";
 
       setErrorMessage(message);
     } finally {
@@ -79,26 +79,26 @@ const ApproveMembers = () => {
     }
   };
 
-  const handleReject = async (id) => {
-    const reason = window.prompt("Reddetme sebebi yazın:", "");
+  const handleRejectReturn = async (loanId) => {
+    const reason = window.prompt("İade reddetme sebebi:", "");
 
     if (reason === null) return;
 
     try {
-      setActionLoadingId(id);
+      setActionLoadingId(loanId);
       setErrorMessage("");
       setSuccessMessage("");
 
-      await api.post(`/api/registration-requests/${id}/reject`, {
+      await api.post(`/api/Loans/${loanId}/reject-return`, {
         reason: reason.trim(),
       });
 
-      setSuccessMessage("Üyelik başvurusu reddedildi.");
-      setPendingUsers((previous) => previous.filter((user) => user.id !== id));
+      setSuccessMessage("İade talebi reddedildi.");
+      setLoans((previous) => previous.filter((loan) => loan.id !== loanId));
     } catch (error) {
       const message =
         error.response?.data?.error?.message ||
-        "Üyelik başvurusu reddedilirken bir hata oluştu.";
+        "İade talebi reddedilirken bir hata oluştu.";
 
       setErrorMessage(message);
     } finally {
@@ -109,7 +109,7 @@ const ApproveMembers = () => {
   const formatDate = (value) => {
     if (!value) return "-";
 
-    return new Date(value).toLocaleDateString("tr-TR", {
+    return new Date(value).toLocaleString("tr-TR", {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
@@ -120,57 +120,61 @@ const ApproveMembers = () => {
 
   return (
     <div style={containerStyle}>
-      <h2 style={{ color: "#2c3e50" }}>Üyelik Onay Bekleyenler</h2>
+      <h2 style={{ color: "#2c3e50" }}>İade Onayı Bekleyen Emanetler</h2>
 
       <p style={descriptionStyle}>
-        Ziyaretçilerin gönderdiği üyelik başvurularını buradan onaylayabilir
-        veya reddedebilirsiniz.
+        Kullanıcıların oluşturduğu iade taleplerini buradan onaylayabilir veya
+        reddedebilirsiniz.
       </p>
 
-      {loading && <div style={messageStyle}>Başvurular yükleniyor...</div>}
+      {loading && <div style={messageStyle}>İade talepleri yükleniyor...</div>}
 
       {errorMessage && <div style={errorStyle}>{errorMessage}</div>}
 
       {successMessage && <div style={successStyle}>{successMessage}</div>}
 
-      {!loading && pendingUsers.length === 0 && !errorMessage && (
+      {!loading && loans.length === 0 && !errorMessage && (
         <div className="card" style={emptyStyle}>
-          Onay bekleyen üyelik başvurusu bulunmuyor.
+          İade onayı bekleyen kayıt bulunmuyor.
         </div>
       )}
 
-      {!loading && pendingUsers.length > 0 && (
+      {!loading && loans.length > 0 && (
         <div className="card" style={tableCardStyle}>
           <table style={tableStyle}>
             <thead>
               <tr style={tableHeaderStyle}>
-                <th style={thStyle}>ID</th>
-                <th style={thStyle}>Ad Soyad</th>
-                <th style={thStyle}>Kullanıcı Adı</th>
-                <th style={thStyle}>E-posta</th>
-                <th style={thStyle}>Telefon</th>
-                <th style={thStyle}>Adres</th>
-                <th style={thStyle}>Başvuru Tarihi</th>
+                <th style={thStyle}>Loan ID</th>
+                <th style={thStyle}>Üye ID</th>
+                <th style={thStyle}>Kopya ID</th>
+                <th style={thStyle}>Alış Tarihi</th>
+                <th style={thStyle}>Son İade Tarihi</th>
+                <th style={thStyle}>İade Talep Tarihi</th>
+                <th style={thStyle}>Durum</th>
                 <th style={thStyle}>İşlem</th>
               </tr>
             </thead>
 
             <tbody>
-              {pendingUsers.map((user) => {
-                const isActionLoading = actionLoadingId === user.id;
+              {loans.map((loan) => {
+                const isActionLoading = actionLoadingId === loan.id;
 
                 return (
-                  <tr key={user.id} style={{ textAlign: "center" }}>
-                    <td style={tdStyle}>{user.id}</td>
-                    <td style={tdStyle}>{user.fullName}</td>
-                    <td style={tdStyle}>{user.username}</td>
-                    <td style={tdStyle}>{user.email}</td>
-                    <td style={tdStyle}>{user.phone}</td>
-                    <td style={tdStyle}>{user.address}</td>
-                    <td style={tdStyle}>{formatDate(user.createdAt)}</td>
+                  <tr key={loan.id} style={{ textAlign: "center" }}>
+                    <td style={tdStyle}>{loan.id}</td>
+                    <td style={tdStyle}>{loan.memberId}</td>
+                    <td style={tdStyle}>{loan.copyId}</td>
+                    <td style={tdStyle}>{formatDate(loan.loanDate)}</td>
+                    <td style={tdStyle}>{formatDate(loan.dueDate)}</td>
+                    <td style={tdStyle}>{formatDate(loan.returnRequestedAt)}</td>
+                    <td style={tdStyle}>
+                      <span style={statusBadgeStyle}>
+                        {loan.status}
+                      </span>
+                    </td>
                     <td style={tdStyle}>
                       <button
-                        onClick={() => handleApprove(user.id)}
+                        onClick={() => handleApproveReturn(loan.id)}
                         disabled={isActionLoading}
                         style={approveBtnStyle}
                       >
@@ -178,7 +182,7 @@ const ApproveMembers = () => {
                       </button>
 
                       <button
-                        onClick={() => handleReject(user.id)}
+                        onClick={() => handleRejectReturn(loan.id)}
                         disabled={isActionLoading}
                         style={rejectBtnStyle}
                       >
@@ -192,6 +196,12 @@ const ApproveMembers = () => {
           </table>
         </div>
       )}
+
+      <p style={noteStyle}>
+        Not: Backend loan DTO'sunda şu an kitap adı gelmediği için tabloda kopya
+        ID gösteriliyor. Kitap adını göstermek istersek backend tarafında
+        LoanItemDto genişletilebilir.
+      </p>
     </div>
   );
 };
@@ -214,11 +224,10 @@ const tableCardStyle = {
 const tableStyle = {
   width: "100%",
   borderCollapse: "collapse",
-  marginTop: "10px",
 };
 
 const tableHeaderStyle = {
-  backgroundColor: "#eee",
+  backgroundColor: "#f4f4f4",
 };
 
 const thStyle = {
@@ -230,6 +239,16 @@ const thStyle = {
 const tdStyle = {
   padding: "12px",
   borderBottom: "1px solid #eee",
+};
+
+const statusBadgeStyle = {
+  display: "inline-block",
+  padding: "5px 10px",
+  borderRadius: "20px",
+  backgroundColor: "#3498db",
+  color: "white",
+  fontSize: "0.8rem",
+  fontWeight: "bold",
 };
 
 const approveBtnStyle = {
@@ -258,6 +277,12 @@ const messageStyle = {
   color: "#7f8c8d",
 };
 
+const emptyStyle = {
+  padding: "25px",
+  color: "#7f8c8d",
+  textAlign: "center",
+};
+
 const errorStyle = {
   backgroundColor: "#fdecea",
   color: "#c0392b",
@@ -274,10 +299,11 @@ const successStyle = {
   marginBottom: "15px",
 };
 
-const emptyStyle = {
-  padding: "25px",
+const noteStyle = {
+  marginTop: "20px",
   color: "#7f8c8d",
-  textAlign: "center",
+  fontSize: "0.85rem",
+  lineHeight: "1.5",
 };
 
-export default ApproveMembers;
+export default PendingReturns;

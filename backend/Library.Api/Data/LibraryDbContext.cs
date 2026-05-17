@@ -112,6 +112,20 @@ namespace Library.Api.Data
                 .HasConversion<string>()
                 .HasMaxLength(50);
 
+            // Reservation belirli bir fiziksel kopyaya bağlanabilir.
+            // Kopya silinirken rezervasyon geçmişi korunmalıdır.
+            builder.Entity<Reservation>()
+                .HasOne(x => x.Copy)
+                .WithMany()
+                .HasForeignKey(x => x.CopyId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Entity<Reservation>()
+                .HasIndex(x => x.CopyId);
+
+            builder.Entity<Reservation>()
+                .HasIndex(x => x.ExpiresAt);
+
             builder.Entity<RegistrationRequest>(entity =>
             {
                 entity.Property(x => x.FullName).IsRequired().HasMaxLength(150);
