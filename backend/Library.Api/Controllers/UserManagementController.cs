@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Library.Api.DTOs.Users;
 using Library.Api.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -8,14 +9,9 @@ namespace Library.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-
-    // Kullanıcı yönetimi yalnızca Admin rolüne açıktır.
-    // Librarian ve User rolleri bu controller üzerinden sistem kullanıcılarını yönetemez.
     [Authorize(Roles = "Admin")]
     public class UserManagementController : ControllerBase
     {
-        // Sistemde izin verilen roller merkezi olarak sınırlandırılır.
-        // Böylece geçersiz veya beklenmeyen rollerin atanması engellenir.
         private static readonly string[] AllowedRoles = { "Admin", "Librarian", "User" };
 
         private readonly UserManager<ApplicationUser> _userManager;
@@ -29,31 +25,51 @@ namespace Library.Api.Controllers
             _roleManager = roleManager;
         }
 
-        // Sistemdeki tüm kullanıcı hesaplarını ve ilk rollerini listeler.
-        // Admin panelindeki kullanıcı yönetimi ekranı için kullanılır.
         [HttpGet]
         public async Task<IActionResult> GetAll()
         {
+            var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
             var users = _userManager.Users.ToList();
+            var adminUsers = await _userManager.GetUsersInRoleAsync("Admin");
+            var adminCount = adminUsers.Count;
+
             var items = new List<UserListItemDto>();
 
             foreach (var user in users)
             {
                 var roles = await _userManager.GetRolesAsync(user);
+                var role = roles.FirstOrDefault() ?? string.Empty;
+
+                var isCurrentUser = user.Id == currentUserId;
+
+                var canChangeRole = true;
+                var disabledReason = string.Empty;
+
+                if (isCurrentUser)
+                {
+                    canChangeRole = false;
+                    disabledReason = "Kendi rolünüzü değiştiremezsiniz.";
+                }
+                else if (role == "Admin" && adminCount <= 1)
+                {
+                    canChangeRole = false;
+                    disabledReason = "Sistemdeki son adminin rolü değiştirilemez.";
+                }
 
                 items.Add(new UserListItemDto
                 {
                     Id = user.Id,
                     Username = user.UserName ?? string.Empty,
-                    Role = roles.FirstOrDefault() ?? string.Empty
+                    Role = role,
+                    IsCurrentUser = isCurrentUser,
+                    CanChangeRole = canChangeRole,
+                    RoleChangeDisabledReason = disabledReason
                 });
             }
 
             return Ok(new { items });
         }
 
-        // Admin tarafından yeni sistem kullanıcısı oluşturur.
-        // Bu endpoint özellikle Admin veya Librarian gibi yönetim hesapları için uygundur.
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateUserDto dto)
         {
@@ -65,7 +81,6 @@ namespace Library.Api.Controllers
             var username = dto.Username.Trim();
             var role = dto.Role.Trim();
 
-            // Username login için benzersiz olmalıdır.
             var existingUser = await _userManager.FindByNameAsync(username);
 
             if (existingUser != null)
@@ -80,7 +95,6 @@ namespace Library.Api.Controllers
                 });
             }
 
-            // İstenen rolün Identity tarafında gerçekten tanımlı olduğu doğrulanır.
             if (!await _roleManager.RoleExistsAsync(role))
             {
                 return BadRequest(new
@@ -96,14 +110,10 @@ namespace Library.Api.Controllers
             var user = new ApplicationUser
             {
                 UserName = username,
-
-                // Bu endpoint email almadığı için username tabanlı local email üretilir.
-                // Gerçek kullanıcı üyeliği için RegistrationRequest akışı daha uygundur.
                 Email = $"{username}@library.local",
                 EmailConfirmed = true
             };
 
-            // Şifre hashleme işlemi ASP.NET Identity tarafından yapılır.
             var createResult = await _userManager.CreateAsync(user, dto.Password);
 
             if (!createResult.Succeeded)
@@ -146,14 +156,14 @@ namespace Library.Api.Controllers
             {
                 Id = user.Id,
                 Username = user.UserName ?? string.Empty,
-                Role = role
+                Role = role,
+                IsCurrentUser = false,
+                CanChangeRole = true
             };
 
             return CreatedAtAction(nameof(GetAll), new { id = user.Id }, response);
         }
 
-        // Mevcut kullanıcının rolünü değiştirir.
-        // Sistem tek rol mantığıyla çalıştığı için önce mevcut roller kaldırılır, sonra yeni rol atanır.
         [HttpPut("{id}/role")]
         public async Task<IActionResult> UpdateRole(string id, [FromBody] UpdateUserRoleDto dto)
         {
@@ -175,7 +185,6 @@ namespace Library.Api.Controllers
 
             var newRole = dto.Role.Trim();
 
-            // Role değeri yalnızca sistemin izin verdiği rollerden biri olabilir.
             if (!AllowedRoles.Contains(newRole))
             {
                 return BadRequest(new
@@ -202,7 +211,20 @@ namespace Library.Api.Controllers
                 });
             }
 
-            // Rolün Identity tarafında tanımlı olması gerekir.
+            var currentUserId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+            if (user.Id == currentUserId)
+            {
+                return BadRequest(new
+                {
+                    error = new
+                    {
+                        code = "SELF_ROLE_CHANGE_NOT_ALLOWED",
+                        message = "Admin cannot change their own role"
+                    }
+                });
+            }
+
             if (!await _roleManager.RoleExistsAsync(newRole))
             {
                 return BadRequest(new
@@ -216,6 +238,36 @@ namespace Library.Api.Controllers
             }
 
             var currentRoles = await _userManager.GetRolesAsync(user);
+            var currentRole = currentRoles.FirstOrDefault();
+
+            if (currentRole == newRole)
+            {
+                return Ok(new UserListItemDto
+                {
+                    Id = user.Id,
+                    Username = user.UserName ?? string.Empty,
+                    Role = newRole,
+                    IsCurrentUser = false,
+                    CanChangeRole = true
+                });
+            }
+
+            if (currentRoles.Contains("Admin") && newRole != "Admin")
+            {
+                var adminUsers = await _userManager.GetUsersInRoleAsync("Admin");
+
+                if (adminUsers.Count <= 1)
+                {
+                    return BadRequest(new
+                    {
+                        error = new
+                        {
+                            code = "LAST_ADMIN_ROLE_CHANGE_NOT_ALLOWED",
+                            message = "The last admin user cannot be changed to another role"
+                        }
+                    });
+                }
+            }
 
             if (currentRoles.Any())
             {
@@ -262,14 +314,14 @@ namespace Library.Api.Controllers
             {
                 Id = user.Id,
                 Username = user.UserName ?? string.Empty,
-                Role = newRole
+                Role = newRole,
+                IsCurrentUser = false,
+                CanChangeRole = true
             };
 
             return Ok(response);
         }
 
-        // Kullanıcı oluşturma için ortak validation metodudur.
-        // Hata varsa standart error envelope formatında BadRequest döndürür.
         private IActionResult? ValidateCreateUserDto(CreateUserDto dto)
         {
             var details = new List<object>();

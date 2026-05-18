@@ -36,7 +36,7 @@ const Navbar = () => {
         📚 Kütüphane
       </div>
 
-      <div style={{ display: "flex", gap: "15px", alignItems: "center" }}>
+      <div style={menuStyle}>
         <Link to="/books" style={linkStyle}>
           Kitaplar
         </Link>
@@ -67,10 +67,6 @@ const Navbar = () => {
               Rezervasyonlarım
             </Link>
 
-            <Link to="/my-reservations" style={linkStyle}>
-              Rezervasyonlarım
-            </Link>
-            
             <Link to="/profile" style={linkStyle}>
               Profil
             </Link>
@@ -87,16 +83,24 @@ const Navbar = () => {
               Yönetim
             </Link>
 
+            <Link to="/pending-reservations" style={linkStyle}>
+              Ayırtılan Kitaplar
+            </Link>
+
             <Link to="/give-loan" style={linkStyle}>
               Kitap Ver
+            </Link>
+
+            <Link to="/active-loans" style={linkStyle}>
+              Emanetteki Kitaplar
             </Link>
 
             <Link to="/pending-returns" style={linkStyle}>
               İade Onayları
             </Link>
 
-            <Link to="/pending-reservations" style={linkStyle}>
-              Ayırtılan Kitaplar
+            <Link to="/overdue-loans" style={linkStyle}>
+              Gecikmişler
             </Link>
 
             <Link to="/approve-members" style={linkStyle}>
@@ -131,12 +135,24 @@ const Navbar = () => {
               Yönetim
             </Link>
 
+            <Link to="/pending-reservations" style={linkStyle}>
+              Ayırtılan Kitaplar
+            </Link>
+
+            <Link to="/give-loan" style={linkStyle}>
+              Kitap Ver
+            </Link>
+
+            <Link to="/active-loans" style={linkStyle}>
+              Emanetteki Kitaplar
+            </Link>
+
             <Link to="/pending-returns" style={linkStyle}>
               İade Onayları
             </Link>
 
-            <Link to="/pending-reservations" style={linkStyle}>
-              Ayırtılan Kitaplar
+            <Link to="/overdue-loans" style={linkStyle}>
+              Gecikmişler
             </Link>
 
             <Link to="/approve-members" style={linkStyle}>
@@ -147,8 +163,16 @@ const Navbar = () => {
               E-posta Onayları
             </Link>
 
+            <Link to="/add-book" style={linkStyle}>
+              + Kitap
+            </Link>
+
             <Link to="/categories" style={linkStyle}>
               Kategoriler
+            </Link>
+
+            <Link to="/authors" style={linkStyle}>
+              Yazarlar
             </Link>
           </>
         )}
@@ -167,7 +191,7 @@ const navStyle = {
   display: "flex",
   justifyContent: "space-between",
   padding: "0 20px",
-  height: "60px",
+  minHeight: "60px",
   backgroundColor: "#2c3e50",
   color: "white",
   alignItems: "center",
@@ -178,12 +202,22 @@ const logoStyle = {
   fontWeight: "bold",
   fontSize: "1.2rem",
   cursor: "pointer",
+  whiteSpace: "nowrap",
+};
+
+const menuStyle = {
+  display: "flex",
+  gap: "15px",
+  alignItems: "center",
+  flexWrap: "wrap",
+  justifyContent: "flex-end",
 };
 
 const linkStyle = {
   color: "white",
   textDecoration: "none",
   fontSize: "0.9rem",
+  whiteSpace: "nowrap",
 };
 
 const regStyle = {
@@ -200,6 +234,7 @@ const logoutBtnStyle = {
   padding: "5px 10px",
   borderRadius: "4px",
   cursor: "pointer",
+  whiteSpace: "nowrap",
 };
 
 export default Navbar;

@@ -173,6 +173,9 @@ if (app.Environment.IsDevelopment())
 // Frontend'den gelen isteklere CORS politikası uygulanır.
 app.UseCors("FrontendDev");
 
+// wwwroot altındaki upload edilmiş kitap görsellerinin frontend tarafından görüntülenmesini sağlar.
+app.UseStaticFiles();
+
 // Önce kullanıcının kimliği doğrulanır.
 app.UseAuthentication();
 

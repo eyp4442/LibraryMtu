@@ -423,3 +423,5 @@ dist/
 .vite/
 .env
 .env.*
+# Uploaded book images
+backend/Library.Api/wwwroot/uploads/

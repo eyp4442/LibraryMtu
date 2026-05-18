@@ -15,6 +15,35 @@ namespace Library.Api.DTOs.Loans
         public DateTime? ReturnRequestedAt { get; set; }
     }
 
+    // Kütüphaneci/Admin panelinde aktif ödünç kayıtlarını daha okunabilir göstermek için kullanılır.
+    public class ActiveLoanItemDto
+    {
+        public int Id { get; set; }
+
+        public int MemberId { get; set; }
+        public string MemberFullName { get; set; } = string.Empty;
+        public string MemberEmail { get; set; } = string.Empty;
+        public string MemberPhone { get; set; } = string.Empty;
+
+        public int CopyId { get; set; }
+        public string Barcode { get; set; } = string.Empty;
+
+        public int BookId { get; set; }
+        public string BookTitle { get; set; } = string.Empty;
+        public string BookAuthor { get; set; } = string.Empty;
+
+        public DateTime LoanDate { get; set; }
+        public DateTime DueDate { get; set; }
+        public DateTime? ReturnDate { get; set; }
+
+        public string Status { get; set; } = string.Empty;
+        public bool IsOverdue { get; set; }
+        public int OverdueDays { get; set; }
+
+        public int RenewCount { get; set; }
+        public DateTime? ReturnRequestedAt { get; set; }
+    }
+
     // Kullanıcının kendi panelinden iade talebi oluşturması için kullanılan request modelidir.
     // Not alanı ileride görevliye açıklama iletmek için kullanılabilir.
     public class RequestReturnDto

@@ -1,7 +1,5 @@
 namespace Library.Api.DTOs.Books
 {
-    // Kitabın fiziksel kopyalarına ait stok durumunu özetleyen response DTO'su.
-    // Bu bilgi BookCopy kayıtlarının durumlarına göre hesaplanır.
     public class StockSummaryDto
     {
         public int Total { get; set; }
@@ -11,11 +9,18 @@ namespace Library.Api.DTOs.Books
         public int PendingReturnApproval { get; set; }
     }
 
-    // Kitap listeleme ve temel kitap gösterimi için kullanılan response DTO'su.
-    // Kitap bilgileriyle birlikte kategori ve stok özetini de frontend'e taşır.
+    public class BookImageDto
+    {
+        public int Id { get; set; }
+        public string ImageUrl { get; set; } = string.Empty;
+        public string OriginalFileName { get; set; } = string.Empty;
+        public DateTime CreatedAt { get; set; }
+    }
+
     public class BookListItemDto
     {
         public int Id { get; set; }
+
         public string Title { get; set; } = string.Empty;
         public string Author { get; set; } = string.Empty;
         public string Isbn { get; set; } = string.Empty;
@@ -26,8 +31,16 @@ namespace Library.Api.DTOs.Books
         public string Description { get; set; } = string.Empty;
         public string? CoverImageUrl { get; set; }
 
-        public int CategoryId { get; set; }
+        public List<BookImageDto> Images { get; set; } = new();
+        public List<string> ImageUrls { get; set; } = new();
+
+        // Geriye uyumluluk için ilk kategori bilgisi.
+        public int? CategoryId { get; set; }
         public string CategoryName { get; set; } = string.Empty;
+
+        // Yeni çoklu kategori alanları.
+        public List<int> CategoryIds { get; set; } = new();
+        public List<string> CategoryNames { get; set; } = new();
 
         public int AvailableCopyCount { get; set; }
         public int TotalCopyCount { get; set; }
@@ -35,14 +48,10 @@ namespace Library.Api.DTOs.Books
         public StockSummaryDto StockSummary { get; set; } = new();
     }
 
-    // Şu an liste DTO'su ile aynı alanları taşır.
-    // Ayrı tutulması, ileride kitap detayına özel alanlar eklenebilmesini kolaylaştırır.
     public class BookDetailDto : BookListItemDto
     {
     }
 
-    // Yeni kitap oluştururken frontend'den gelen request modelidir.
-    // Fiziksel kopya bilgileri burada yer almaz; kopyalar BookCopies modülüyle ayrıca eklenir.
     public class CreateBookDto
     {
         public string Title { get; set; } = string.Empty;
@@ -54,10 +63,14 @@ namespace Library.Api.DTOs.Books
         public int PageCount { get; set; }
         public string Description { get; set; } = string.Empty;
         public string? CoverImageUrl { get; set; }
-        public int CategoryId { get; set; }
+
+        // Eski frontend/body ile uyumluluk için tutulur.
+        public int? CategoryId { get; set; }
+
+        // Yeni çoklu kategori alanı.
+        public List<int> CategoryIds { get; set; } = new();
     }
 
-    // Mevcut kitap bilgilerini güncellemek için kullanılan request modelidir.
     public class UpdateBookDto
     {
         public string Title { get; set; } = string.Empty;
@@ -69,6 +82,11 @@ namespace Library.Api.DTOs.Books
         public int PageCount { get; set; }
         public string Description { get; set; } = string.Empty;
         public string? CoverImageUrl { get; set; }
-        public int CategoryId { get; set; }
+
+        // Eski frontend/body ile uyumluluk için tutulur.
+        public int? CategoryId { get; set; }
+
+        // Yeni çoklu kategori alanı.
+        public List<int> CategoryIds { get; set; } = new();
     }
 }

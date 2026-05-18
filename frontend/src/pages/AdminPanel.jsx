@@ -1,4 +1,3 @@
-// src/pages/AdminPanel.jsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
@@ -145,35 +144,42 @@ const AdminPanel = () => {
     }
   };
 
-  const handleRoleChange = async (userId, newRole) => {
+  const handleRoleChange = async (user, newRole) => {
+    if (!user.canChangeRole) {
+      setErrorMessage(
+        user.roleChangeDisabledReason ||
+          "Bu kullanıcının rolü bu ekrandan değiştirilemez."
+      );
+      return;
+    }
+
+    if (user.role === newRole) return;
+
     const confirmed = window.confirm(
-      `Bu kullanıcının rolünü ${newRole} yapmak istiyor musunuz?`
+      `${user.username} kullanıcısının rolünü ${newRole} yapmak istiyor musunuz?`
     );
 
     if (!confirmed) return;
 
     try {
-      setActionLoadingId(userId);
+      setActionLoadingId(user.id);
       setErrorMessage("");
       setSuccessMessage("");
 
-      await api.put(`/api/UserManagement/${userId}/role`, {
+      await api.put(`/api/UserManagement/${user.id}/role`, {
         role: newRole,
       });
 
       setSuccessMessage("Kullanıcı rolü başarıyla güncellendi.");
 
-      setUsers((previous) =>
-        previous.map((user) =>
-          user.id === userId ? { ...user, role: newRole } : user
-        )
-      );
+      await loadAdminPanel();
     } catch (error) {
       const message =
         error.response?.data?.error?.message ||
         "Kullanıcı rolü güncellenirken bir hata oluştu.";
 
       setErrorMessage(message);
+      await loadAdminPanel();
     } finally {
       setActionLoadingId(null);
     }
@@ -285,7 +291,9 @@ const AdminPanel = () => {
       </div>
 
       <div className="card" style={sectionStyle}>
-        <h3 style={{ marginTop: 0, color: "#2c3e50" }}>Kullanıcı ve Rol Yönetimi</h3>
+        <h3 style={{ marginTop: 0, color: "#2c3e50" }}>
+          Kullanıcı ve Rol Yönetimi
+        </h3>
 
         {users.length === 0 ? (
           <div style={messageCardStyle}>Kullanıcı bulunamadı.</div>
@@ -294,7 +302,6 @@ const AdminPanel = () => {
             <table style={tableStyle}>
               <thead>
                 <tr style={tableHeaderStyle}>
-                  <th style={thStyle}>Kullanıcı ID</th>
                   <th style={thStyle}>Kullanıcı Adı</th>
                   <th style={thStyle}>Mevcut Rol</th>
                   <th style={thStyle}>Rol Değiştir</th>
@@ -302,29 +309,54 @@ const AdminPanel = () => {
               </thead>
 
               <tbody>
-                {users.map((user) => (
-                  <tr key={user.id} style={{ textAlign: "center" }}>
-                    <td style={tdStyle}>{user.id}</td>
-                    <td style={tdStyle}>{user.username}</td>
-                    <td style={tdStyle}>
-                      <span style={roleBadgeStyle(user.role)}>{user.role || "-"}</span>
-                    </td>
-                    <td style={tdStyle}>
-                      <select
-                        value={user.role || ""}
-                        onChange={(event) =>
-                          handleRoleChange(user.id, event.target.value)
-                        }
-                        disabled={actionLoadingId === user.id}
-                        style={selectStyle}
-                      >
-                        <option value="Admin">Admin</option>
-                        <option value="Librarian">Librarian</option>
-                        <option value="User">User</option>
-                      </select>
-                    </td>
-                  </tr>
-                ))}
+                {users.map((user) => {
+                  const selectDisabled =
+                    actionLoadingId === user.id || !user.canChangeRole;
+
+                  return (
+                    <tr key={user.id} style={{ textAlign: "center" }}>
+                      <td style={tdStyle}>
+                        <strong>{user.username}</strong>
+
+                        {user.isCurrentUser && (
+                          <div style={currentUserTextStyle}>Mevcut hesabınız</div>
+                        )}
+                      </td>
+
+                      <td style={tdStyle}>
+                        <span style={roleBadgeStyle(user.role)}>
+                          {user.role || "-"}
+                        </span>
+                      </td>
+
+                      <td style={tdStyle}>
+                        <select
+                          value={user.role || ""}
+                          onChange={(event) =>
+                            handleRoleChange(user, event.target.value)
+                          }
+                          disabled={selectDisabled}
+                          style={{
+                            ...selectStyle,
+                            opacity: selectDisabled ? 0.6 : 1,
+                            cursor: selectDisabled ? "not-allowed" : "pointer",
+                          }}
+                          title={user.roleChangeDisabledReason || ""}
+                        >
+                          <option value="Admin">Admin</option>
+                          <option value="Librarian">Librarian</option>
+                          <option value="User">User</option>
+                        </select>
+
+                        {!user.canChangeRole && (
+                          <div style={disabledReasonStyle}>
+                            {user.roleChangeDisabledReason}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -345,6 +377,10 @@ const AdminPanel = () => {
 
           <button onClick={() => navigate("/give-loan")} style={quickBtnStyle}>
             Ödünç Ver
+          </button>
+
+          <button onClick={() => navigate("/active-loans")} style={quickBtnStyle}>
+            Emanetteki Kitaplar
           </button>
 
           <button onClick={() => navigate("/books")} style={quickBtnStyle}>
@@ -457,6 +493,18 @@ const roleBadgeStyle = (role) => ({
       ? "#2980b9"
       : "#27ae60",
 });
+
+const currentUserTextStyle = {
+  marginTop: "5px",
+  fontSize: "0.78rem",
+  color: "#7f8c8d",
+};
+
+const disabledReasonStyle = {
+  marginTop: "6px",
+  fontSize: "0.78rem",
+  color: "#c0392b",
+};
 
 const buttonGroupStyle = {
   display: "flex",
