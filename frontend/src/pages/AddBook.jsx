@@ -14,12 +14,14 @@ const AddBook = () => {
     language: "",
     pageCount: "",
     description: "",
-    categoryId: "",
+    categoryIds: [],
     coverImageUrl: "",
   });
 
   const [categories, setCategories] = useState([]);
   const [barcodes, setBarcodes] = useState([""]);
+  const [selectedImageFiles, setSelectedImageFiles] = useState([]);
+
   const [loading, setLoading] = useState(false);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -45,6 +47,7 @@ const AddBook = () => {
 
     try {
       setCategoriesLoading(true);
+      setErrorMessage("");
 
       const response = await api.get("/api/Categories");
       setCategories(response.data.items || []);
@@ -68,12 +71,32 @@ const AddBook = () => {
     }));
   };
 
+  const handleCategoryToggle = (categoryId) => {
+    setBookData((previous) => {
+      const exists = previous.categoryIds.includes(categoryId);
+
+      return {
+        ...previous,
+        categoryIds: exists
+          ? previous.categoryIds.filter((id) => id !== categoryId)
+          : [...previous.categoryIds, categoryId],
+      };
+    });
+  };
+
+  const handleImageFilesChange = (event) => {
+    const files = Array.from(event.target.files || []);
+    setSelectedImageFiles(files);
+  };
+
   const addBarcodeField = () => {
     setBarcodes((previous) => [...previous, ""]);
   };
 
   const removeBarcodeField = (index) => {
-    setBarcodes((previous) => previous.filter((_, itemIndex) => itemIndex !== index));
+    setBarcodes((previous) =>
+      previous.filter((_, itemIndex) => itemIndex !== index)
+    );
   };
 
   const handleBarcodeChange = (index, value) => {
@@ -86,19 +109,43 @@ const AddBook = () => {
     if (!bookData.title.trim()) return "Kitap adı zorunludur.";
     if (!bookData.author.trim()) return "Yazar zorunludur.";
     if (!bookData.isbn.trim()) return "ISBN zorunludur.";
+
     if (!bookData.publishedYear || Number(bookData.publishedYear) <= 0) {
       return "Yayın yılı 0'dan büyük olmalıdır.";
     }
+
     if (!bookData.publisher.trim()) return "Yayınevi zorunludur.";
     if (!bookData.language.trim()) return "Dil zorunludur.";
+
     if (!bookData.pageCount || Number(bookData.pageCount) <= 0) {
       return "Sayfa sayısı 0'dan büyük olmalıdır.";
     }
-    if (!bookData.categoryId || Number(bookData.categoryId) <= 0) {
-      return "Kategori seçilmelidir.";
+
+    if (bookData.categoryIds.length === 0) {
+      return "En az bir kategori seçilmelidir.";
     }
 
     return null;
+  };
+
+  const uploadBookImages = async (bookId) => {
+    if (selectedImageFiles.length === 0) return;
+
+    const formData = new FormData();
+
+    selectedImageFiles.forEach((file) => {
+      formData.append("files", file);
+    });
+
+    // URL boşsa ilk yüklenen dosya otomatik kapak olur.
+    // URL doluysa URL kapak olarak kalır, dosyalar galeriye eklenir.
+    formData.append("setFirstAsCover", String(!bookData.coverImageUrl.trim()));
+
+    await api.post(`/api/Books/${bookId}/images`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
   };
 
   const handleSubmit = async (event) => {
@@ -127,10 +174,12 @@ const AddBook = () => {
         pageCount: Number(bookData.pageCount),
         description: bookData.description.trim(),
         coverImageUrl: bookData.coverImageUrl.trim() || null,
-        categoryId: Number(bookData.categoryId),
+        categoryIds: bookData.categoryIds,
       });
 
       const createdBook = createBookResponse.data;
+
+      await uploadBookImages(createdBook.id);
 
       const cleanedBarcodes = barcodes
         .map((barcode) => barcode.trim())
@@ -145,21 +194,6 @@ const AddBook = () => {
       setSuccessMessage(
         `${createdBook.title} başarıyla eklendi. ${cleanedBarcodes.length} adet kopya oluşturuldu.`
       );
-
-      setBookData({
-        title: "",
-        author: "",
-        isbn: "",
-        publishedYear: "",
-        publisher: "",
-        language: "",
-        pageCount: "",
-        description: "",
-        categoryId: "",
-        coverImageUrl: "",
-      });
-
-      setBarcodes([""]);
 
       setTimeout(() => {
         navigate(`/book/${createdBook.id}`);
@@ -226,12 +260,38 @@ const AddBook = () => {
             <input
               type="text"
               name="coverImageUrl"
-              placeholder="http://..."
+              placeholder="https://..."
               style={inputStyle}
               value={bookData.coverImageUrl}
               onChange={handleInputChange}
             />
           </div>
+        </div>
+
+        <div style={groupStyle}>
+          <label style={labelStyle}>Bilgisayardan Kapak/Galeri Görselleri</label>
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            multiple
+            style={inputStyle}
+            onChange={handleImageFilesChange}
+          />
+
+          <small style={hintStyle}>
+            JPG, PNG veya WEBP seçebilirsiniz. Birden fazla dosya seçilebilir.
+            URL boşsa ilk seçilen görsel kapak olarak kullanılır.
+          </small>
+
+          {selectedImageFiles.length > 0 && (
+            <div style={fileListStyle}>
+              {selectedImageFiles.map((file) => (
+                <span key={`${file.name}-${file.size}`} style={fileItemStyle}>
+                  {file.name}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         <div style={rowStyle}>
@@ -287,25 +347,27 @@ const AddBook = () => {
         </div>
 
         <div style={groupStyle}>
-          <label style={labelStyle}>Kategori</label>
-          <select
-            name="categoryId"
-            required
-            style={inputStyle}
-            value={bookData.categoryId}
-            onChange={handleInputChange}
-            disabled={categoriesLoading}
-          >
-            <option value="">
-              {categoriesLoading ? "Kategoriler yükleniyor..." : "Kategori Seçin"}
-            </option>
+          <label style={labelStyle}>Kategoriler</label>
 
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
+          <div style={categoryBoxStyle}>
+            {categoriesLoading && <span>Kategoriler yükleniyor...</span>}
+
+            {!categoriesLoading && categories.length === 0 && (
+              <span>Henüz kategori bulunmuyor.</span>
+            )}
+
+            {!categoriesLoading &&
+              categories.map((category) => (
+                <label key={category.id} style={checkboxLabelStyle}>
+                  <input
+                    type="checkbox"
+                    checked={bookData.categoryIds.includes(category.id)}
+                    onChange={() => handleCategoryToggle(category.id)}
+                  />
+                  {category.name}
+                </label>
+              ))}
+          </div>
         </div>
 
         <div style={groupStyle}>
@@ -319,7 +381,9 @@ const AddBook = () => {
         </div>
 
         <div style={barcodeSection}>
-          <h4 style={{ margin: "0 0 10px 0" }}>📋 Kitap Kopyaları / Barkodlar</h4>
+          <h4 style={{ margin: "0 0 10px 0" }}>
+            📋 Kitap Kopyaları / Barkodlar
+          </h4>
 
           {barcodes.map((barcode, index) => (
             <div key={index} style={barcodeRowStyle}>
@@ -328,7 +392,9 @@ const AddBook = () => {
                 placeholder={`Barkod ${index + 1}`}
                 style={{ ...inputStyle, flex: 1 }}
                 value={barcode}
-                onChange={(event) => handleBarcodeChange(index, event.target.value)}
+                onChange={(event) =>
+                  handleBarcodeChange(index, event.target.value)
+                }
               />
 
               {barcodes.length > 1 && (
@@ -349,7 +415,6 @@ const AddBook = () => {
         </div>
 
         {errorMessage && <div style={errorStyle}>{errorMessage}</div>}
-
         {successMessage && <div style={successStyle}>{successMessage}</div>}
 
         <button type="submit" style={saveBtnStyle} disabled={loading}>
@@ -360,7 +425,6 @@ const AddBook = () => {
   );
 };
 
-// --- TASARIM STİLLERİ ---
 const containerStyle = {
   padding: "40px",
   maxWidth: "800px",
@@ -401,6 +465,45 @@ const inputStyle = {
   borderRadius: "8px",
   border: "1px solid #ddd",
   fontSize: "1rem",
+};
+
+const hintStyle = {
+  marginTop: "6px",
+  color: "#7f8c8d",
+  fontSize: "0.8rem",
+};
+
+const fileListStyle = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "8px",
+  marginTop: "10px",
+};
+
+const fileItemStyle = {
+  backgroundColor: "#ecf0f1",
+  padding: "5px 8px",
+  borderRadius: "6px",
+  fontSize: "0.8rem",
+  color: "#34495e",
+};
+
+const categoryBoxStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+  gap: "10px",
+  border: "1px solid #ddd",
+  borderRadius: "8px",
+  padding: "12px",
+  backgroundColor: "#f8f9fa",
+};
+
+const checkboxLabelStyle = {
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+  color: "#34495e",
+  fontSize: "0.9rem",
 };
 
 const barcodeSection = {

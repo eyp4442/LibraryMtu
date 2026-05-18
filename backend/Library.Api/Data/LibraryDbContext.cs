@@ -16,7 +16,9 @@ namespace Library.Api.Data
         public DbSet<EmailChangeRequest> EmailChangeRequests => Set<EmailChangeRequest>();
         public DbSet<Category> Categories => Set<Category>();
         public DbSet<Book> Books => Set<Book>();
+        public DbSet<BookCategory> BookCategories => Set<BookCategory>();
         public DbSet<BookCopy> BookCopies => Set<BookCopy>();
+        public DbSet<BookImage> BookImages => Set<BookImage>();
         public DbSet<Member> Members => Set<Member>();
         public DbSet<Loan> Loans => Set<Loan>();
         public DbSet<Reservation> Reservations => Set<Reservation>();
@@ -61,12 +63,46 @@ namespace Library.Api.Data
                 .HasForeignKey(x => x.CategoryId)
                 .OnDelete(DeleteBehavior.Restrict);
 
+                // Book ve Category arasında çoktan çoğa ilişki kurulur.
+                // Aynı kitap-kategori eşleşmesi ikinci kez eklenemez.
+                builder.Entity<BookCategory>(entity =>
+                {
+                    entity.HasKey(x => new { x.BookId, x.CategoryId });
+
+                    entity.HasOne(x => x.Book)
+                        .WithMany(x => x.BookCategories)
+                        .HasForeignKey(x => x.BookId)
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    entity.HasOne(x => x.Category)
+                        .WithMany(x => x.BookCategories)
+                        .HasForeignKey(x => x.CategoryId)
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    entity.HasIndex(x => x.CategoryId);
+                });
+
             // Book silinirken bağlı fiziksel kopyalar varsa silme engellenir.
             builder.Entity<BookCopy>()
                 .HasOne(x => x.Book)
                 .WithMany(x => x.Copies)
                 .HasForeignKey(x => x.BookId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+                // Book ile BookImage arasında bire-çok ilişki.
+                // Kitap silinirse ona bağlı görsel kayıtları da silinir.
+                builder.Entity<BookImage>(entity =>
+                {
+                    entity.Property(x => x.ImageUrl).IsRequired().HasMaxLength(500);
+                    entity.Property(x => x.OriginalFileName).HasMaxLength(255);
+
+                    entity.HasIndex(x => x.BookId);
+
+                    entity.HasOne(x => x.Book)
+                        .WithMany(x => x.Images)
+                        .HasForeignKey(x => x.BookId)
+                        .OnDelete(DeleteBehavior.Cascade);
+                });
 
             // Loan geçmişi olan Member kaydının silinmesi engellenir.
             builder.Entity<Loan>()

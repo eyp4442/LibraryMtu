@@ -23,6 +23,9 @@ import AdminPanel from "./pages/AdminPanel";
 import PendingReturns from "./pages/PendingReturns";
 import MyReservations from "./pages/MyReservations";
 import PendingReservations from "./pages/PendingReservations";
+import EditBook from "./pages/EditBook";
+import OverdueLoans from "./pages/OverdueLoans";
+import ActiveLoans from "./pages/ActiveLoans";
 
 function App() {
   return (
@@ -122,6 +125,15 @@ function App() {
           />
 
           <Route
+            path="/active-loans"
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "Librarian"]}>
+                <ActiveLoans />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/pending-reservations"
             element={
               <ProtectedRoute allowedRoles={["Admin", "Librarian"]}>
@@ -135,6 +147,24 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={["Admin", "Librarian"]}>
                 <AddBook />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/books/:id/edit"
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "Librarian"]}>
+                <EditBook />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/overdue-loans"
+            element={
+              <ProtectedRoute allowedRoles={["Admin", "Librarian"]}>
+                <OverdueLoans />
               </ProtectedRoute>
             }
           />

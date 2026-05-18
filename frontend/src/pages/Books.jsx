@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
+import { getImageUrl } from "../utils/imageUrl";
 
 const Books = () => {
   const navigate = useNavigate();
@@ -42,18 +43,42 @@ const Books = () => {
     loadBooks();
   }, []);
 
-  const categories = useMemo(() => {
-    const categoryNames = books
-      .map((book) => book.categoryName)
-      .filter(Boolean);
+  const getBookCategoryNames = (book) => {
+    if (Array.isArray(book.categoryNames) && book.categoryNames.length > 0) {
+      return book.categoryNames;
+    }
 
-    return [...new Set(categoryNames)];
+    if (book.categoryName) {
+      return [book.categoryName];
+    }
+
+    return [];
+  };
+
+  const getBookCoverUrl = (book) => {
+    if (book.coverImageUrl) {
+      return getImageUrl(book.coverImageUrl);
+    }
+
+    if (Array.isArray(book.imageUrls) && book.imageUrls.length > 0) {
+      return getImageUrl(book.imageUrls[0]);
+    }
+
+    return "";
+  };
+
+  const categories = useMemo(() => {
+    const categoryNames = books.flatMap((book) => getBookCategoryNames(book));
+
+    return [...new Set(categoryNames)].sort((a, b) => a.localeCompare(b, "tr"));
   }, [books]);
 
   const filteredBooks = useMemo(() => {
     if (!selectedCategory) return books;
 
-    return books.filter((book) => book.categoryName === selectedCategory);
+    return books.filter((book) =>
+      getBookCategoryNames(book).includes(selectedCategory)
+    );
   }, [books, selectedCategory]);
 
   const handleFilter = () => {
@@ -83,9 +108,9 @@ const Books = () => {
           placeholder="Kitap başlığı, yazar, ISBN veya yayınevi ile ara..."
           style={searchInputStyle}
           value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
+          onChange={(event) => setSearchTerm(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
               handleFilter();
             }
           }}
@@ -94,7 +119,7 @@ const Books = () => {
         <select
           style={selectStyle}
           value={selectedCategory}
-          onChange={(e) => setSelectedCategory(e.target.value)}
+          onChange={(event) => setSelectedCategory(event.target.value)}
         >
           <option value="">Tüm Kategoriler</option>
 
@@ -110,22 +135,12 @@ const Books = () => {
         </button>
       </div>
 
-      {loading && (
-        <div style={messageStyle}>
-          Kitaplar yükleniyor...
-        </div>
-      )}
+      {loading && <div style={messageStyle}>Kitaplar yükleniyor...</div>}
 
-      {errorMessage && (
-        <div style={errorStyle}>
-          {errorMessage}
-        </div>
-      )}
+      {errorMessage && <div style={errorStyle}>{errorMessage}</div>}
 
       {!loading && !errorMessage && filteredBooks.length === 0 && (
-        <div style={messageStyle}>
-          Gösterilecek kitap bulunamadı.
-        </div>
+        <div style={messageStyle}>Gösterilecek kitap bulunamadı.</div>
       )}
 
       <div style={gridStyle}>
@@ -134,15 +149,14 @@ const Books = () => {
           const totalCount = book.totalCopyCount ?? 0;
           const isAvailable = availableCount > 0;
 
+          const categoryNames = getBookCategoryNames(book);
+          const coverUrl = getBookCoverUrl(book);
+
           return (
             <div key={book.id} className="card" style={bookCardStyle}>
               <div style={bookCoverStyle}>
-                {book.coverImageUrl ? (
-                  <img
-                    src={book.coverImageUrl}
-                    alt={book.title}
-                    style={coverImageStyle}
-                  />
+                {coverUrl ? (
+                  <img src={coverUrl} alt={book.title} style={coverImageStyle} />
                 ) : (
                   <span style={{ fontSize: "3rem" }}>📖</span>
                 )}
@@ -154,13 +168,22 @@ const Books = () => {
 
               <div style={{ padding: "15px" }}>
                 <h4 style={titleStyle}>{book.title}</h4>
+
                 <p style={authorStyle}>{book.author}</p>
 
-                <div style={infoRowStyle}>
-                  <span style={categoryTagStyle}>
-                    {book.categoryName || "Kategori Yok"}
-                  </span>
+                <div style={categoryListStyle}>
+                  {categoryNames.length > 0 ? (
+                    categoryNames.map((category) => (
+                      <span key={category} style={categoryTagStyle}>
+                        {category}
+                      </span>
+                    ))
+                  ) : (
+                    <span style={categoryTagStyle}>Kategori Yok</span>
+                  )}
+                </div>
 
+                <div style={infoRowStyle}>
                   <span style={{ fontSize: "0.8rem", color: "#95a5a6" }}>
                     Mevcut: {availableCount} / {totalCount}
                   </span>
@@ -181,7 +204,6 @@ const Books = () => {
   );
 };
 
-// --- STİLLER ---
 const filterBarStyle = {
   display: "flex",
   gap: "15px",
@@ -262,16 +284,16 @@ const titleStyle = {
 };
 
 const authorStyle = {
-  margin: "0 0 15px 0",
+  margin: "0 0 12px 0",
   color: "#7f8c8d",
   fontSize: "0.9rem",
 };
 
-const infoRowStyle = {
+const categoryListStyle = {
   display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  marginBottom: "20px",
+  flexWrap: "wrap",
+  gap: "6px",
+  marginBottom: "15px",
 };
 
 const categoryTagStyle = {
@@ -281,6 +303,13 @@ const categoryTagStyle = {
   fontSize: "0.75rem",
   color: "#34495e",
   fontWeight: "600",
+};
+
+const infoRowStyle = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  marginBottom: "20px",
 };
 
 const detailBtnStyle = {

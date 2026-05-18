@@ -1,4 +1,3 @@
-// src/pages/LibrarianDashboard.jsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/axios";
@@ -10,6 +9,7 @@ const LibrarianDashboard = () => {
     pendingMembers: 0,
     pendingEmailChanges: 0,
     pendingReturns: 0,
+    pendingReservations: 0,
     overdueBooks: 0,
     totalBooks: 0,
   });
@@ -43,12 +43,14 @@ const LibrarianDashboard = () => {
         pendingMembersResponse,
         pendingEmailsResponse,
         pendingReturnsResponse,
+        pendingReservationsResponse,
         overdueLoansResponse,
         booksResponse,
       ] = await Promise.all([
         api.get("/api/registration-requests/pending"),
         api.get("/api/email-change-requests/pending"),
         api.get("/api/Loans/pending-return"),
+        api.get("/api/Reservations/pending"),
         api.get("/api/Loans/overdue"),
         api.get("/api/Books", {
           params: {
@@ -62,6 +64,7 @@ const LibrarianDashboard = () => {
         pendingMembers: pendingMembersResponse.data.items?.length || 0,
         pendingEmailChanges: pendingEmailsResponse.data.items?.length || 0,
         pendingReturns: pendingReturnsResponse.data.items?.length || 0,
+        pendingReservations: pendingReservationsResponse.data.items?.length || 0,
         overdueBooks: overdueLoansResponse.data.items?.length || 0,
         totalBooks: booksResponse.data.total || 0,
       });
@@ -126,6 +129,18 @@ const LibrarianDashboard = () => {
         </div>
 
         <div style={cardStyle}>
+          <h3>{stats.pendingReservations}</h3>
+          <p>Ayırtılan Kitap</p>
+
+          <button
+            onClick={() => navigate("/pending-reservations")}
+            style={miniBtnStyle}
+          >
+            Görüntüle
+          </button>
+        </div>
+
+        <div style={cardStyle}>
           <h3>{stats.pendingReturns}</h3>
           <p>İade Onayı Bekleyen Emanet</p>
 
@@ -141,8 +156,11 @@ const LibrarianDashboard = () => {
           <h3>{stats.overdueBooks}</h3>
           <p>Gecikmiş Ödünç Kaydı</p>
 
-          <button onClick={() => navigate("/give-loan")} style={miniBtnStyle}>
-            Ödünç İşlemleri
+          <button
+            onClick={() => navigate("/overdue-loans")}
+            style={miniBtnStyle}
+          >
+            Listele
           </button>
         </div>
 
@@ -168,8 +186,16 @@ const LibrarianDashboard = () => {
             Kategorileri Yönet
           </button>
 
+          <button onClick={() => navigate("/books")} style={actionBtnStyle}>
+            Kitapları Gör
+          </button>
+
           <button onClick={() => navigate("/give-loan")} style={actionBtnStyle}>
-            Kitap Ödünç Ver
+            Manuel Kitap Ver
+          </button>
+
+          <button onClick={() => navigate("/active-loans")} style={actionBtnStyle}>
+            Emanetteki Kitaplar
           </button>
 
           <button
@@ -184,6 +210,13 @@ const LibrarianDashboard = () => {
             style={actionBtnStyle}
           >
             İade Onayları
+          </button>
+
+          <button
+            onClick={() => navigate("/overdue-loans")}
+            style={actionBtnStyle}
+          >
+            Gecikmiş Kayıtlar
           </button>
 
           <button

@@ -161,6 +161,74 @@ namespace Library.Api.Controllers
             return Created($"/api/loans/{loan.Id}", MapLoan(loan));
         }
 
+            // Şu anda kullanıcıların üzerinde bulunan kitapları listeler.
+            // Kütüphaneci/Admin bu ekran üzerinden kitabın kimde olduğunu, hangi barkodun verildiğini
+            // ve iade tarihinin geçip geçmediğini görebilir.
+            [HttpGet("active")]
+            public async Task<IActionResult> GetActiveLoans()
+            {
+                var now = DateTime.UtcNow;
+
+                var loans = await _context.Loans
+                    .AsNoTracking()
+                    .Include(x => x.Member)
+                    .Include(x => x.Copy)
+                        .ThenInclude(x => x.Book)
+                    .Where(x =>
+                        x.ReturnDate == null &&
+                        (
+                            x.Status == LoanStatus.Active ||
+                            x.Status == LoanStatus.ReturnPendingApproval
+                        ))
+                    .OrderBy(x => x.DueDate)
+                    .ToListAsync();
+
+                var items = loans.Select(x =>
+                {
+                    var isOverdue = x.DueDate < now;
+                    var overdueDays = isOverdue
+                        ? Math.Max(1, (int)Math.Ceiling((now - x.DueDate).TotalDays))
+                        : 0;
+
+                    var visibleStatus = x.Status.ToString();
+
+                    if (x.Status == LoanStatus.Active && isOverdue)
+                    {
+                        visibleStatus = "Overdue";
+                    }
+
+                    return new ActiveLoanItemDto
+                    {
+                        Id = x.Id,
+
+                        MemberId = x.MemberId,
+                        MemberFullName = x.Member.FullName,
+                        MemberEmail = x.Member.Email,
+                        MemberPhone = x.Member.Phone,
+
+                        CopyId = x.CopyId,
+                        Barcode = x.Copy.Barcode,
+
+                        BookId = x.Copy.BookId,
+                        BookTitle = x.Copy.Book.Title,
+                        BookAuthor = x.Copy.Book.Author,
+
+                        LoanDate = x.LoanDate,
+                        DueDate = x.DueDate,
+                        ReturnDate = x.ReturnDate,
+
+                        Status = visibleStatus,
+                        IsOverdue = isOverdue,
+                        OverdueDays = overdueDays,
+
+                        RenewCount = x.RenewCount,
+                        ReturnRequestedAt = x.ReturnRequestedAt
+                    };
+                }).ToList();
+
+                return Ok(new { items });
+            }
+
         // Kullanıcıların oluşturduğu ve görevli onayı bekleyen iade taleplerini listeler.
         [HttpGet("pending-return")]
         public async Task<IActionResult> GetPendingReturn()

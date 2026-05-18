@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../api/axios";
+import { getImageUrl } from "../utils/imageUrl";
 
 const BookDetail = () => {
   const { id } = useParams();
@@ -9,8 +10,8 @@ const BookDetail = () => {
   const [book, setBook] = useState(null);
   const [copies, setCopies] = useState([]);
   const [newBarcode, setNewBarcode] = useState("");
-
   const [holdMinutes, setHoldMinutes] = useState(1440);
+  const [selectedImageUrl, setSelectedImageUrl] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [copiesLoading, setCopiesLoading] = useState(false);
@@ -45,7 +46,16 @@ const BookDetail = () => {
       setErrorMessage("");
 
       const response = await api.get(`/api/Books/${id}`);
-      setBook(response.data);
+      const loadedBook = response.data;
+
+      setBook(loadedBook);
+
+      const firstUploadedImage =
+        Array.isArray(loadedBook.imageUrls) && loadedBook.imageUrls.length > 0
+          ? loadedBook.imageUrls[0]
+          : "";
+
+      setSelectedImageUrl(loadedBook.coverImageUrl || firstUploadedImage || "");
     } catch (error) {
       const message =
         error.response?.data?.error?.message ||
@@ -141,6 +151,40 @@ const BookDetail = () => {
     }
   };
 
+  const getGalleryImages = () => {
+    if (!book) return [];
+
+    const images = [];
+
+    if (book.coverImageUrl) {
+      images.push({
+        id: "cover",
+        imageUrl: book.coverImageUrl,
+        originalFileName: "Kapak görseli",
+      });
+    }
+
+    if (Array.isArray(book.images)) {
+      book.images.forEach((image) => {
+        if (image?.imageUrl) {
+          images.push(image);
+        }
+      });
+    }
+
+    const uniqueImages = [];
+    const seenUrls = new Set();
+
+    images.forEach((image) => {
+      if (!seenUrls.has(image.imageUrl)) {
+        uniqueImages.push(image);
+        seenUrls.add(image.imageUrl);
+      }
+    });
+
+    return uniqueImages;
+  };
+
   if (loading) {
     return (
       <div style={containerStyle}>
@@ -168,8 +212,18 @@ const BookDetail = () => {
   const availableCount = book.availableCopyCount ?? 0;
   const totalCount = book.totalCopyCount ?? 0;
   const stockSummary = book.stockSummary || {};
-
   const canReserve = isUser && totalCount > 0 && availableCount > 0;
+
+  const galleryImages = getGalleryImages();
+  const displayedImageUrl =
+    selectedImageUrl ||
+    book.coverImageUrl ||
+    (galleryImages.length > 0 ? galleryImages[0].imageUrl : "");
+
+  const categoryText =
+    Array.isArray(book.categoryNames) && book.categoryNames.length > 0
+      ? book.categoryNames.join(", ")
+      : book.categoryName || "Kategori yok";
 
   return (
     <div style={containerStyle}>
@@ -178,11 +232,43 @@ const BookDetail = () => {
       </button>
 
       <div className="card" style={detailCardStyle}>
-        <div style={coverStyle}>
-          {book.coverImageUrl ? (
-            <img src={book.coverImageUrl} alt={book.title} style={coverImageStyle} />
-          ) : (
-            <span style={{ fontSize: "4rem" }}>📖</span>
+        <div style={imageColumnStyle}>
+          <div style={coverStyle}>
+            {displayedImageUrl ? (
+              <img
+                src={getImageUrl(displayedImageUrl)}
+                alt={book.title}
+                style={coverImageStyle}
+              />
+            ) : (
+              <span style={{ fontSize: "4rem" }}>📖</span>
+            )}
+          </div>
+
+          {galleryImages.length > 0 && (
+            <div style={galleryStyle}>
+              {galleryImages.map((image) => (
+                <button
+                  key={image.id || image.imageUrl}
+                  type="button"
+                  onClick={() => setSelectedImageUrl(image.imageUrl)}
+                  style={{
+                    ...thumbnailButtonStyle,
+                    border:
+                      selectedImageUrl === image.imageUrl
+                        ? "2px solid #3498db"
+                        : "1px solid #ddd",
+                  }}
+                  title={image.originalFileName || "Kitap görseli"}
+                >
+                  <img
+                    src={getImageUrl(image.imageUrl)}
+                    alt={image.originalFileName || "Kitap görseli"}
+                    style={thumbnailImageStyle}
+                  />
+                </button>
+              ))}
+            </div>
           )}
         </div>
 
@@ -214,7 +300,7 @@ const BookDetail = () => {
           </p>
 
           <p style={rowStyle}>
-            <strong>Kategori:</strong> {book.categoryName}
+            <strong>Kategoriler:</strong> {categoryText}
           </p>
 
           <p style={rowStyle}>
@@ -229,6 +315,15 @@ const BookDetail = () => {
             <br />
             {book.description || "Açıklama bulunmuyor."}
           </p>
+
+          {isStaff && (
+            <button
+              onClick={() => navigate(`/books/${id}/edit`)}
+              style={editBookBtnStyle}
+            >
+              Kitabı Düzenle
+            </button>
+          )}
 
           <div style={reservationBoxStyle}>
             {!accessToken && (
@@ -404,7 +499,7 @@ const BookDetail = () => {
 const containerStyle = {
   padding: "40px",
   fontFamily: "sans-serif",
-  maxWidth: "1000px",
+  maxWidth: "1050px",
   margin: "0 auto",
 };
 
@@ -415,10 +510,14 @@ const detailCardStyle = {
   marginBottom: "25px",
 };
 
+const imageColumnStyle = {
+  width: "240px",
+  minWidth: "240px",
+};
+
 const coverStyle = {
-  width: "220px",
-  height: "320px",
-  minWidth: "220px",
+  width: "240px",
+  height: "340px",
   backgroundColor: "#f1f2f6",
   display: "flex",
   alignItems: "center",
@@ -428,6 +527,29 @@ const coverStyle = {
 };
 
 const coverImageStyle = {
+  width: "100%",
+  height: "100%",
+  objectFit: "cover",
+};
+
+const galleryStyle = {
+  display: "flex",
+  gap: "8px",
+  flexWrap: "wrap",
+  marginTop: "12px",
+};
+
+const thumbnailButtonStyle = {
+  width: "52px",
+  height: "68px",
+  padding: 0,
+  borderRadius: "6px",
+  overflow: "hidden",
+  backgroundColor: "#f1f2f6",
+  cursor: "pointer",
+};
+
+const thumbnailImageStyle = {
   width: "100%",
   height: "100%",
   objectFit: "cover",
@@ -451,6 +573,17 @@ const descriptionStyle = {
   color: "#34495e",
   marginTop: "20px",
   lineHeight: "1.6",
+};
+
+const editBookBtnStyle = {
+  marginTop: "15px",
+  padding: "12px 16px",
+  backgroundColor: "#f39c12",
+  color: "white",
+  border: "none",
+  borderRadius: "8px",
+  cursor: "pointer",
+  fontWeight: "bold",
 };
 
 const reservationBoxStyle = {
